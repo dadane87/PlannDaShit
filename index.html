@@ -1,0 +1,1462 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0E7C86">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Retreat">
+<title>Familien-Retreat 17.8.–6.9.</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --tinte:#10303A;
+  --wasser:#0E7C86;
+  --wasser-tief:#0A5A62;
+  --becken:#CFEAEC;
+  --becken-hell:#E6F4F5;
+  --papier:#F2F7F6;
+  --karte:#FFFFFF;
+  --sonne:#E8A22B;
+  --sonne-hell:#FDF3DF;
+  --wiese:#4C7A4E;
+  --wiese-hell:#E7F0E5;
+  --stein:#7C8F92;
+  --linie:#DCE8E8;
+  --alarm:#C1553B;
+  --alarm-hell:#FBEAE5;
+  --schrift-d:'Archivo',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --schrift-b:'Inter',system-ui,-apple-system,'Segoe UI',sans-serif;
+  --safe-b:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  font-family:var(--schrift-b);
+  background:var(--papier);
+  color:var(--tinte);
+  font-size:15px;
+  line-height:1.5;
+  padding-bottom:calc(70px + var(--safe-b));
+  overscroll-behavior-y:none;
+}
+h1,h2,h3,h4{font-family:var(--schrift-d);margin:0;letter-spacing:-.02em}
+
+/* ── Kopf ─────────────────────────────────────────── */
+.kopf{
+  background:var(--wasser);
+  color:#fff;
+  padding:14px 16px 0;
+  position:sticky;top:0;z-index:40;
+  padding-top:calc(14px + env(safe-area-inset-top,0px));
+}
+.kopf-zeile{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.kopf h1{font-size:19px;font-weight:800;text-transform:uppercase;letter-spacing:.01em}
+.kopf .spanne{font-size:12px;font-weight:600;opacity:.85;font-family:var(--schrift-d);white-space:nowrap}
+.wasserlinie{display:block;width:100%;height:10px;margin-top:8px}
+
+/* ── Bahnen (Tagesleiste) ─────────────────────────── */
+.bahnen{
+  display:flex;gap:6px;overflow-x:auto;
+  padding:10px 16px 12px;
+  background:var(--karte);
+  border-bottom:1px solid var(--linie);
+  position:sticky;top:0;z-index:30;
+  scrollbar-width:none;
+}
+.bahnen::-webkit-scrollbar{display:none}
+.bahn{
+  flex:0 0 auto;min-width:46px;
+  border:1.5px solid var(--linie);
+  border-radius:10px;
+  background:var(--karte);
+  padding:5px 7px 6px;
+  text-align:center;cursor:pointer;
+  font-family:var(--schrift-d);
+  transition:transform .12s ease;
+}
+.bahn:active{transform:scale(.94)}
+.bahn .wd{font-size:10px;font-weight:700;color:var(--stein);text-transform:uppercase;letter-spacing:.06em}
+.bahn .dt{font-size:13px;font-weight:700;margin-top:1px;font-variant-numeric:tabular-nums}
+.bahn .balken{height:3px;border-radius:2px;margin-top:5px;background:var(--linie)}
+.bahn[data-t="aktiv"] .balken{background:var(--wiese)}
+.bahn[data-t="ruhe"]  .balken{background:var(--wasser)}
+.bahn[data-t="besuch"].bahn .balken{background:var(--sonne)}
+.bahn[data-t="voll"]  .balken{background:var(--alarm)}
+.bahn[data-t="reise"] .balken{background:#7B6BA8}
+.bahn[data-t="puffer"] .balken{background:#B6C2C3}
+.bahn.aktiv-tag{border-color:var(--tinte);background:var(--becken-hell)}
+.bahn.heute{border-color:var(--sonne);border-width:2px}
+.bahn.heute .dt::after{content:"•";color:var(--sonne);margin-left:2px}
+
+/* ── Inhalt ───────────────────────────────────────── */
+.inhalt{padding:14px 14px 20px;max-width:640px;margin:0 auto}
+.tab-inhalt{display:none}
+.tab-inhalt.an{display:block}
+
+.karte{
+  background:var(--karte);
+  border:1px solid var(--linie);
+  border-radius:14px;
+  margin-bottom:12px;
+  overflow:hidden;
+}
+.karte-kopf{
+  padding:12px 14px;
+  border-bottom:1px solid var(--linie);
+  display:flex;align-items:center;gap:10px;justify-content:space-between;
+}
+.karte-kopf h2{font-size:15px;font-weight:700}
+.karte-koerper{padding:12px 14px}
+
+/* Tageskarte */
+.tagkarte{scroll-margin-top:120px}
+.tagkarte .datum{display:flex;align-items:baseline;gap:8px}
+.tagkarte .datum .gross{font-family:var(--schrift-d);font-size:22px;font-weight:800;font-variant-numeric:tabular-nums}
+.tagkarte .datum .wd{font-family:var(--schrift-d);font-size:13px;font-weight:700;color:var(--stein);text-transform:uppercase;letter-spacing:.06em}
+.woche-band{
+  font-family:var(--schrift-d);font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;
+  color:var(--wasser-tief);background:var(--becken-hell);
+  padding:7px 14px;border-radius:8px;margin:18px 0 10px;
+}
+.plakette{
+  font-family:var(--schrift-d);font-size:11px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.05em;
+  padding:4px 9px;border-radius:20px;white-space:nowrap;
+}
+.p-aktiv {background:var(--wiese-hell);color:var(--wiese)}
+.p-ruhe  {background:var(--becken);color:var(--wasser-tief)}
+.p-besuch{background:var(--sonne-hell);color:#9A6A12}
+.p-voll  {background:var(--alarm-hell);color:var(--alarm)}
+.p-reise {background:#EEEAF6;color:#5C4B8A}
+.p-puffer{background:#ECEFEF;color:#6B7A7C}
+
+/* ── Kalenderblatt ───────────────────────────────── */
+.blatt-werkzeug{
+  display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;
+}
+.blatt-rolle{overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:6px}
+#kalenderblatt{
+  width:1180px;background:#fff;padding:16px 18px 14px;
+  border:1px solid var(--linie);border-radius:12px;
+}
+.kb-kopf{display:flex;justify-content:space-between;align-items:baseline;
+  border-bottom:2px solid var(--wasser);padding-bottom:7px;margin-bottom:12px}
+.kb-kopf h2{font-size:19px;font-weight:800;text-transform:uppercase;letter-spacing:.02em}
+.kb-kopf .sp{font-family:var(--schrift-d);font-size:13px;font-weight:700;color:var(--wasser)}
+.kb-tab{width:100%;border-collapse:collapse;table-layout:fixed}
+.kb-tab th{
+  font-family:var(--schrift-d);font-size:10px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.12em;color:var(--stein);
+  padding:0 0 5px;text-align:left;border-bottom:1px solid var(--linie);
+}
+.kb-tab th.kb-rand{width:96px}
+.kb-tab td{
+  vertical-align:top;padding:0;border:1px solid var(--linie);
+  width:154px;height:176px;
+}
+.kb-tab td.kb-rand{
+  border:none;padding:8px 9px 0 0;width:96px;background:none;height:auto;
+}
+.kb-rand .rg{font-family:var(--schrift-d);font-size:12px;font-weight:800;line-height:1.25}
+.kb-rand .ph{font-size:10px;color:var(--wasser);font-weight:600;margin-top:2px;line-height:1.3}
+.kb-luft td{border:none;height:7px;padding:0}
+
+.kb-zelle{height:100%;display:flex;flex-direction:column;overflow:hidden}
+.kb-band{height:4px;flex:0 0 auto}
+.kb-t-aktiv .kb-band{background:var(--wiese)}
+.kb-t-ruhe  .kb-band{background:var(--wasser)}
+.kb-t-besuch .kb-band{background:var(--sonne)}
+.kb-t-voll  .kb-band{background:var(--alarm)}
+.kb-t-reise .kb-band{background:#7B6BA8}
+.kb-t-puffer .kb-band{background:#B6C2C3}
+.kb-t-puffer .kb-inhalt{background:#FAFBFB}
+.kb-inhalt{padding:6px 8px 7px;flex:1;min-height:0;overflow:hidden}
+.kb-datum{display:flex;align-items:baseline;margin-bottom:1px}
+.kb-datum .n{margin-right:5px}
+.kb-datum .n{font-family:var(--schrift-d);font-size:17px;font-weight:800;line-height:1}
+.kb-datum .m{font-family:var(--schrift-d);font-size:9px;font-weight:700;color:var(--stein)}
+.kb-typ{font-family:var(--schrift-d);font-size:8.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.07em;color:var(--stein);margin-bottom:5px}
+.kb-fix{display:flex;font-size:9.5px;line-height:1.3;margin-bottom:2px}
+.kb-fix b{margin-right:5px}
+.kb-fix b{font-family:var(--schrift-d);color:var(--wasser);white-space:nowrap;font-weight:700}
+.kb-abschnitt{margin-top:5px;padding-top:4px;border-top:1px dotted var(--linie);
+  font-size:9.5px;line-height:1.35}
+.kb-marke{font-family:var(--schrift-d);font-size:7.5px;font-weight:800;
+  letter-spacing:.1em;text-transform:uppercase;display:block;margin-bottom:1px}
+.kb-eltern .kb-marke{color:#B07C1A}
+.kb-eltern{color:#8A6314}
+.kb-haus .kb-marke{color:var(--stein)}
+.kb-haus{color:#5F6E70}
+.kb-fuss{display:flex;justify-content:space-between;gap:16px;margin-top:11px;
+  padding-top:8px;border-top:1px solid var(--linie);font-size:9.5px;line-height:1.45}
+.kb-leg{display:flex;flex-wrap:wrap;align-items:center}
+.kb-leg span{margin:0 12px 3px 0}
+.kb-leg span{display:flex;align-items:center;white-space:nowrap;
+  font-family:var(--schrift-d);font-size:9px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--stein)}
+.kb-leg i{width:13px;height:4px;border-radius:2px;display:inline-block;margin-right:5px}
+.kb-notizen{flex:1;max-width:560px;color:var(--tinte)}
+.kb-notizen b{font-family:var(--schrift-d)}
+
+@media print{
+  .kopf,.bahnen,.fuss,.blatt-werkzeug,.toast,.hinterlegung{display:none!important}
+  body{padding:0;background:#fff;font-size:10px}
+  .inhalt{padding:0;max-width:none}
+  .tab-inhalt{display:none!important}
+  .tab-inhalt.an{display:block!important}
+  .blatt-rolle{overflow:visible}
+  #kalenderblatt{width:100%;border:none;border-radius:0;padding:0}
+  .kb-tab td{height:auto;min-height:150px}
+  .kb-zelle{min-height:150px}
+  @page{size:A4 landscape;margin:9mm}
+}
+
+/* Feld */
+.feld{margin-bottom:12px}
+.feld:last-child{margin-bottom:0}
+.feld-titel{
+  font-family:var(--schrift-d);font-size:10.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.09em;color:var(--stein);
+  margin-bottom:4px;display:flex;align-items:center;gap:5px;
+}
+.feld-wert{
+  padding:8px 10px;border-radius:9px;background:var(--papier);
+  border:1px dashed transparent;cursor:pointer;min-height:20px;
+  white-space:pre-wrap;word-break:break-word;
+}
+.feld-wert:hover,.feld-wert:focus-visible{border-color:var(--becken)}
+.feld-wert.leer{color:var(--stein);font-style:italic}
+.feld.eltern .feld-wert{background:var(--sonne-hell)}
+.feld.eltern .feld-titel{color:#9A6A12}
+.feld.notiz .feld-wert{background:var(--alarm-hell);color:#8A3A26}
+.feld.notiz .feld-titel{color:var(--alarm)}
+
+/* Fixtermine */
+.fix-liste{list-style:none;margin:0;padding:0}
+.fix{
+  display:flex;gap:9px;align-items:flex-start;
+  padding:8px 10px;border-radius:9px;
+  background:var(--becken-hell);
+  border-left:3px solid var(--wasser);
+  margin-bottom:6px;
+}
+.fix .zeit{
+  font-family:var(--schrift-d);font-weight:700;font-size:12px;
+  color:var(--wasser-tief);white-space:nowrap;flex:0 0 auto;
+  padding-top:1px;font-variant-numeric:tabular-nums;
+}
+.fix .txt{flex:1;min-width:0}
+.fix .txt .t{font-weight:600;font-size:14px}
+.fix .txt .n{font-size:12px;color:var(--stein);margin-top:1px}
+.fix .weg{
+  flex:0 0 auto;background:none;border:none;color:var(--stein);
+  font-size:17px;line-height:1;padding:2px 4px;cursor:pointer;
+}
+
+/* Optionen */
+.opt{
+  display:flex;gap:9px;align-items:flex-start;
+  padding:9px 11px;border-radius:10px;
+  border:1.5px solid var(--linie);background:var(--karte);
+  margin-bottom:6px;cursor:pointer;
+}
+.opt .mark{
+  flex:0 0 auto;width:19px;height:19px;border-radius:50%;
+  border:2px solid var(--linie);margin-top:1px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:11px;color:#fff;font-weight:700;
+}
+.opt .lbl{
+  font-family:var(--schrift-d);font-size:10.5px;font-weight:700;
+  letter-spacing:.08em;color:var(--stein);text-transform:uppercase;
+}
+.opt.gewaehlt{border-color:var(--wiese);background:var(--wiese-hell)}
+.opt.gewaehlt .mark{background:var(--wiese);border-color:var(--wiese)}
+.opt.gewaehlt .lbl{color:var(--wiese)}
+.opt-txt{flex:1;min-width:0}
+
+/* Haken-Listen */
+.hakenliste{list-style:none;margin:0;padding:0}
+.haken{
+  display:flex;gap:10px;align-items:flex-start;
+  padding:9px 4px;border-bottom:1px solid var(--linie);
+}
+.haken:last-child{border-bottom:none}
+.haken .box{
+  flex:0 0 auto;width:21px;height:21px;border-radius:6px;
+  border:2px solid var(--becken);background:var(--karte);
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  font-size:13px;color:#fff;margin-top:1px;
+}
+.haken.fertig .box{background:var(--wasser);border-color:var(--wasser)}
+.haken.fertig .haken-txt{text-decoration:line-through;color:var(--stein)}
+.haken-txt{flex:1;min-width:0;cursor:pointer;word-break:break-word}
+.haken .weg{
+  flex:0 0 auto;background:none;border:none;color:var(--stein);
+  font-size:17px;line-height:1;padding:0 4px;cursor:pointer;
+}
+
+/* Ideen */
+.idee{padding:9px 4px;border-bottom:1px solid var(--linie);display:flex;gap:8px}
+.idee:last-child{border-bottom:none}
+.idee-txt{flex:1;min-width:0}
+.idee .nm{font-weight:600;cursor:pointer}
+.idee .dt{font-size:13px;color:var(--stein);margin-top:1px;cursor:pointer;word-break:break-word}
+
+/* Rhythmus */
+.rhy{display:flex;gap:10px;padding:9px 4px;border-bottom:1px solid var(--linie)}
+.rhy:last-child{border-bottom:none}
+.rhy .z{
+  font-family:var(--schrift-d);font-weight:700;font-size:12px;
+  color:var(--wasser-tief);flex:0 0 84px;padding-top:2px;
+  font-variant-numeric:tabular-nums;
+}
+.rhy .k{flex:1;min-width:0}
+.rhy.stern{background:var(--sonne-hell);border-radius:9px;padding:10px;border-bottom:none;margin:4px 0}
+.rhy .e{font-size:12.5px;color:#9A6A12;font-weight:600;margin-top:3px}
+
+/* Knöpfe */
+.knopf{
+  font-family:var(--schrift-d);font-weight:700;font-size:13px;
+  border-radius:9px;border:1.5px solid var(--linie);
+  background:var(--karte);color:var(--tinte);
+  padding:9px 13px;cursor:pointer;
+}
+.knopf.voll{background:var(--wasser);border-color:var(--wasser);color:#fff}
+.knopf.klein{font-size:12px;padding:6px 10px}
+.knopf.gefahr{color:var(--alarm);border-color:var(--alarm-hell)}
+.knopf-reihe{display:flex;gap:8px;flex-wrap:wrap}
+.plus{
+  width:100%;margin-top:8px;background:var(--becken-hell);
+  border:1.5px dashed var(--becken);color:var(--wasser-tief);
+}
+
+/* Editor */
+.hinterlegung{
+  position:fixed;inset:0;background:rgba(16,48,58,.55);
+  z-index:90;display:flex;align-items:flex-end;
+}
+.hinterlegung[hidden]{display:none}
+.blatt{
+  background:var(--karte);width:100%;
+  border-radius:18px 18px 0 0;padding:16px 16px calc(16px + var(--safe-b));
+  max-height:86vh;overflow-y:auto;
+}
+.blatt h3{font-size:15px;margin-bottom:10px}
+.blatt textarea,.blatt input{
+  width:100%;font-family:var(--schrift-b);font-size:16px;
+  border:1.5px solid var(--becken);border-radius:10px;
+  padding:10px;background:var(--papier);color:var(--tinte);
+  resize:vertical;margin-bottom:10px;
+}
+.blatt textarea:focus,.blatt input:focus{outline:2px solid var(--wasser);border-color:var(--wasser)}
+.blatt label{
+  font-family:var(--schrift-d);font-size:10.5px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.08em;color:var(--stein);
+  display:block;margin-bottom:4px;
+}
+
+/* Fußleiste */
+.fuss{
+  position:fixed;left:0;right:0;bottom:0;z-index:50;
+  background:var(--karte);border-top:1px solid var(--linie);
+  display:flex;padding-bottom:var(--safe-b);
+}
+.fuss button{
+  flex:1;background:none;border:none;padding:9px 2px 10px;
+  font-family:var(--schrift-d);font-size:10px;font-weight:700;
+  letter-spacing:.04em;color:var(--stein);cursor:pointer;
+  display:flex;flex-direction:column;align-items:center;gap:3px;
+}
+.fuss button .ic{font-size:18px;line-height:1}
+.fuss button.an{color:var(--wasser)}
+
+.hinweis{
+  background:var(--sonne-hell);border-left:3px solid var(--sonne);
+  border-radius:0 10px 10px 0;padding:11px 13px;font-size:13.5px;
+  margin-bottom:12px;
+}
+.hinweis.warn{background:var(--alarm-hell);border-color:var(--alarm)}
+.hinweis strong{font-family:var(--schrift-d)}
+.mini{font-size:12px;color:var(--stein);margin-top:6px}
+.toast{
+  position:fixed;bottom:calc(80px + var(--safe-b));left:50%;
+  transform:translateX(-50%);background:var(--tinte);color:#fff;
+  padding:10px 18px;border-radius:22px;font-size:13.5px;font-weight:500;
+  z-index:95;opacity:0;transition:opacity .2s;pointer-events:none;
+  max-width:88vw;text-align:center;
+}
+.toast.zeig{opacity:1}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+<header class="kopf">
+  <div class="kopf-zeile">
+    <h1>Familien-Retreat</h1>
+    <span class="spanne">17.8. – 6.9.</span>
+  </div>
+  <svg class="wasserlinie" viewBox="0 0 400 10" preserveAspectRatio="none" aria-hidden="true">
+    <path d="M0 6 Q 25 1 50 6 T 100 6 T 150 6 T 200 6 T 250 6 T 300 6 T 350 6 T 400 6"
+          fill="none" stroke="rgba(255,255,255,.5)" stroke-width="2"/>
+  </svg>
+</header>
+
+<nav class="bahnen" id="bahnen" aria-label="Tage"></nav>
+
+<main class="inhalt">
+  <section class="tab-inhalt an" id="tab-plan"></section>
+  <section class="tab-inhalt" id="tab-einkauf"></section>
+  <section class="tab-inhalt" id="tab-blatt"></section>
+  <section class="tab-inhalt" id="tab-ideen"></section>
+  <section class="tab-inhalt" id="tab-listen"></section>
+  <section class="tab-inhalt" id="tab-info"></section>
+</main>
+
+<nav class="fuss" id="fuss">
+  <button data-tab="plan" class="an"><span class="ic">🗓</span>Plan</button>
+  <button data-tab="einkauf"><span class="ic">🛒</span>Einkauf</button>
+  <button data-tab="blatt"><span class="ic">▦</span>Blatt</button>
+  <button data-tab="ideen"><span class="ic">🧸</span>Ideen</button>
+  <button data-tab="listen"><span class="ic">✓</span>Listen</button>
+  <button data-tab="info"><span class="ic">⋯</span>Mehr</button>
+</nav>
+
+<div class="hinterlegung" id="editor" hidden>
+  <div class="blatt">
+    <h3 id="ed-titel">Bearbeiten</h3>
+    <div id="ed-felder"></div>
+    <div class="knopf-reihe">
+      <button class="knopf voll" id="ed-speichern" style="flex:1">Speichern</button>
+      <button class="knopf" id="ed-abbrechen">Abbrechen</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══ Speicher (fällt auf Arbeitsspeicher zurück, falls blockiert) ══ */
+const Speicher=(()=>{
+  let ok=true,ersatz={};
+  try{localStorage.setItem('__t','1');localStorage.removeItem('__t')}catch(e){ok=false}
+  return{
+    lies(k){try{return ok?localStorage.getItem(k):(ersatz[k]??null)}catch(e){return ersatz[k]??null}},
+    schreib(k,v){try{ok?localStorage.setItem(k,v):ersatz[k]=v}catch(e){ersatz[k]=v}},
+    dauerhaft:ok
+  };
+})();
+</script>
+
+
+
+
+
+
+
+
+
+
+
+<script>
+/* ══ Ausgangsdaten ══ */
+const START = {
+  version: 4,
+  tage: [
+    /* ─── Woche 1 ─── */
+    {id:"d01",wd:"Mo",datum:"17.8.",iso:"2026-08-17",woche:"Woche 1 · Besuchswoche",typ:"besuch",typLabel:"Ganztags weg",
+     fix:[{id:"f1",zeit:"ganztägig",titel:"Ausflug mit Yara & Emilio",notiz:"organisiert von Jeannine"}],
+     programm:"Ganztägig unterwegs. Kein zusätzliches Programm einplanen.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Ruhezeit unterwegs nehmen, wo es geht. Abends früh runterkommen.",
+     essen:"Brotzeit-Pakete am Vorabend packen. Abends: Nudelauflauf für Dienstag vorkochen.",
+     haushalt:"Lieferung 1 muss schon Sa 16.8. da sein – heute seid ihr weg.",
+     notiz:""},
+
+    {id:"d02",wd:"Di",datum:"18.8.",iso:"2026-08-18",woche:"",typ:"besuch",typLabel:"Besuchstag",
+     fix:[{id:"f2",zeit:"08:30–08:55",titel:"Physio Daniel",notiz:""},
+          {id:"f3",zeit:"09:00–15:00",titel:"Raphi & Tillmann besuchen",notiz:"organisiert von Jeannine"}],
+     programm:"Gäste den ganzen Vormittag über. Ab 15 Uhr ruhig auslaufen lassen.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Kein Ausflug zusätzlich. Nach 15 Uhr bewusst nichts mehr vornehmen.",
+     essen:"Mittagessen für alle – am Vorabend vorgekocht (Nudelauflauf oder Ofengemüse mit Kartoffeln).",
+     haushalt:"",notiz:""},
+
+    {id:"d03",wd:"Mi",datum:"19.8.",iso:"2026-08-19",woche:"",typ:"voll",typLabel:"Volltag",
+     fix:[{id:"f4",zeit:"08:00–09:15",titel:"Physio Daniel",notiz:""},
+          {id:"f5",zeit:"ganztägig",titel:"Steffi zu Besuch",notiz:""},
+          {id:"f6",zeit:"12:15–13:15",titel:"Pediküre Jeannine",notiz:""},
+          {id:"f7",zeit:"17:00–18:00",titel:"Tilda Impfung",notiz:""}],
+     programm:"Vollster Tag der drei Wochen. Nichts zusätzlich einplanen.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Putz-Block gestrichen. Abends nur noch das Abendritual, sonst nichts.",
+     essen:"Mittagessen auf 11:30 vorziehen (Pediküre ab 12:15). Abends nach der Impfung nur etwas ganz Einfaches.",
+     haushalt:"Lieferung 2 heute Abend bestellen.",
+     notiz:"Nach der Impfung kann Tilda quengelig werden oder Fieber bekommen."},
+
+    {id:"d04",wd:"Do",datum:"20.8.",iso:"2026-08-20",woche:"",typ:"besuch",typLabel:"Tagesausflug",
+     fix:[{id:"f8",zeit:"ganztägig",titel:"Geburtstag Tobias, Bobingen",notiz:"ca. 1,5 Std. pro Strecke"}],
+     programm:"Tagesausflug nach Bobingen. Fahrtzeiten bewusst für den Schlaf der Kleinen nutzen.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Härtester Tag der drei Wochen. Freitagvormittag danach bleibt frei als Erholung.",
+     essen:"Großzügige Auto-Verpflegung plus Kühltasche. Vor Ort seid ihr vermutlich versorgt.",
+     haushalt:"",
+     notiz:"Tag nach Tildas Impfung. Bei Fieber ohne schlechtes Gewissen absagen – vorher mit Tobias abstimmen, dass das passieren kann."},
+
+    {id:"d05",wd:"Fr",datum:"21.8.",iso:"2026-08-21",woche:"",typ:"besuch",typLabel:"Besuchstag",
+     fix:[{id:"f9",zeit:"nachmittags",titel:"Marci, Lisa & Mahdi zu Besuch",notiz:""}],
+     programm:"Vormittag frei als Erholung. Kuchen backen mit der Großen – ist selbst schon die Aktivität.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Vormittag bewusst leer halten. Kein Programm vor 14 Uhr.",
+     essen:"Kaffee & Kuchen am Nachmittag, abends grillen.",
+     haushalt:"Lieferung 2 kommt vormittags.",notiz:""},
+
+    {id:"d06",wd:"Sa",datum:"22.8.",iso:"2026-08-22",woche:"",typ:"besuch",typLabel:"Ganztags weg",
+     fix:[{id:"f10",zeit:"ganztägig",titel:"Oberraith mit Lisa",notiz:""}],
+     programm:"Ganztägig unterwegs.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Babysitter-Abend hier gestrichen – nach einem ganzen Tag auswärts unrealistisch. Verschoben auf Do 27.8.",
+     essen:"Brotzeit mitnehmen: Semmeln, Käse, Gurke, Obst.",
+     haushalt:"Grillfleisch abends aus dem Froster in den Kühlschrank legen.",notiz:""},
+
+    {id:"d07",wd:"So",datum:"23.8.",iso:"2026-08-23",woche:"",typ:"besuch",typLabel:"Grillen daheim",
+     fix:[{id:"f11",zeit:"—",titel:"Fotobücher get together",notiz:"bei euch daheim, mit Grillen"}],
+     programm:"Grillen im Garten. Die Kinder haben Auslauf, ihr müsst nirgends hin.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Eltern-Date entfällt – Gäste bis in den Abend.",
+     essen:"Grillen für 6–8 Personen. Fleisch war seit gestern Abend im Kühlschrank zum Auftauen.",
+     haushalt:"",
+     notiz:"Für Daniel: eigene Grillschale, Kartoffel-/Gurkensalat ohne Essig, frisches Fleisch statt gereifter Ware."},
+
+    /* ─── Woche 2 ─── */
+    {id:"d08",wd:"Mo",datum:"24.8.",iso:"2026-08-24",woche:"Woche 2 · Retreat-Woche",typ:"ruhe",typLabel:"Struktur-Tag",
+     fix:[],
+     programm:"Tagesplan-Tafel mit Bildkarten basteln, Wochen-Essensplan aufhängen, Spielzeug aussortieren und Rotationssystem starten.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Ruhezeit-Fenster einführen. Die Besuchswoche ist vorbei – jetzt beginnt der eigentliche Retreat.",
+     essen:"Normale Wochenversorgung. Nichts Aufwendiges.",
+     haushalt:"Lieferung 3 heute Abend bestellen.",notiz:""},
+
+    {id:"d09",wd:"Di",datum:"25.8.",iso:"2026-08-25",woche:"",typ:"aktiv",typLabel:"Aktivtag",
+     fix:[],
+     programm:"Der eine München-Tag der drei Wochen.",
+     optA:"München – Englischer Garten (Spielplatz, Kleinhesseloher See, Biergarten-Pause)",
+     optB:"Tierpark Hellabrunn, München",
+     gewaehlt:null,
+     eltern:"Rückfahrt so timen, dass die Kleine im Auto schläft.",
+     essen:"Proviant mitnehmen, unterwegs nur Kleinigkeiten kaufen.",
+     haushalt:"",notiz:""},
+
+    {id:"d10",wd:"Mi",datum:"26.8.",iso:"2026-08-26",woche:"",typ:"ruhe",typLabel:"Halbtag",
+     fix:[{id:"f12",zeit:"14:00–15:30",titel:"Kinderturnen",notiz:"organisiert von Jeannine"},
+          {id:"f13",zeit:"16:15–17:30",titel:"Physio Erding",notiz:""}],
+     programm:"Nachmittag ist verplant. Vormittag bewusst ruhig halten.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Putz-Block auf den Vormittag legen – nachmittags geht nichts mehr.",
+     essen:"Frühes Mittagessen, damit ihr um 14 Uhr los könnt.",
+     haushalt:"Wochenputz, 45 Min vormittags: einer putzt, einer ist mit den Kindern draußen.",notiz:""},
+
+    {id:"d11",wd:"Do",datum:"27.8.",iso:"2026-08-27",woche:"",typ:"aktiv",typLabel:"Aktivtag",
+     fix:[],
+     programm:"Letzter freier Aktivtag vor Bobingen.",
+     optA:"„Spielkistl\" Ebersberg – Hüpfburg in den eigenen Garten holen, Urlaubstag zuhause",
+     optB:"Erlebnisbauernhof in der Region (Ponys & Ziegen streicheln)",
+     gewaehlt:null,
+     eltern:"Babysitter-Abend 1: Der Sitter hütet nur die Babyphone, ihr geht essen.",
+     essen:"Mittags einfach. Abends seid ihr auswärts.",
+     haushalt:"Lieferung 4 heute bestellen (Bobingen-Erstausstattung).",notiz:""},
+
+    {id:"d12",wd:"Fr",datum:"28.8.",iso:"2026-08-28",woche:"",typ:"reise",typLabel:"Pack-Tag",
+     fix:[{id:"f14",zeit:"11:45–13:45",titel:"Friseur Jeannine",notiz:"organisiert von Jeannine"}],
+     programm:"Großer Packtag für Bobingen. Zwei Stunden läuft nur ein Elternteil – deshalb schon vormittags anfangen.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Ruhezeit-Fenster trotzdem halten.",
+     essen:"Kühlschrank leer essen. Reste-Tag.",
+     haushalt:"Packliste abarbeiten (siehe Listen). Übergabe mit der Schwägerin final klären.",notiz:""},
+
+    /* ─── Woche 3 ─── */
+    {id:"d13",wd:"Sa",datum:"29.8.",iso:"2026-08-29",woche:"Woche 3 · Bobingen",typ:"reise",typLabel:"Anreise",
+     fix:[{id:"f15",zeit:"29.8.–5.9.",titel:"Bobingen Urlaub",notiz:"mehrtägiger Ganztagstermin"}],
+     programm:"Anreise nach Bobingen, Haus übernehmen, Garten erkunden. Kein weiteres Programm.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Ruhezeit-Fenster, wenn am Reisetag möglich.",
+     essen:"Lieferung 4 kommt heute oder morgen. Sonst unterwegs an der A8 stoppen.",
+     haushalt:"Ankommen, auspacken, mehr nicht.",notiz:""},
+
+    {id:"d14",wd:"So",datum:"30.8.",iso:"2026-08-30",woche:"",typ:"ruhe",typLabel:"Ruhetag",
+     fix:[],
+     programm:"Ankommen vertiefen. Erster vorsichtiger Pool-Kontakt, kurz und im Flachen.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Nach dem Zubettgehen: erster gemeinsamer Whirlpool-Abend.",
+     essen:"Einfach kochen, das Haus erst kennenlernen.",
+     haushalt:"",notiz:""},
+
+    {id:"d15",wd:"Mo",datum:"31.8.",iso:"2026-08-31",woche:"",typ:"ruhe",typLabel:"Ruhetag",
+     fix:[{id:"f16",zeit:"08:00–09:00",titel:"Geburtstagsessen Beate, Wellenburg",notiz:"Uhrzeit prüfen – wirkt wie ein Kalenderfehler"}],
+     programm:"Pool und Garten. Kurzer Spaziergang zum Wasserspielplatz in Bobingen.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Ruhezeit-Fenster plus kurzer Putz-Block.",
+     essen:"Je nachdem, wann das Geburtstagsessen wirklich stattfindet.",
+     haushalt:"Wochenputz, kurz – im fremden Haus reicht weniger.",
+     notiz:"Uhrzeit des Geburtstagsessens früh klären. Falls abends: keine Abendverpflegung einkaufen."},
+
+    {id:"d16",wd:"Di",datum:"1.9.",iso:"2026-09-01",woche:"",typ:"ruhe",typLabel:"Ruhetag",
+     fix:[],
+     programm:"Pool, freies Spiel. Garten-Mission: Pflanzen gießen als Aufgabe der Großen.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Ruhezeit-Fenster.",
+     essen:"Grillen im Garten der Schwägerin, falls der Grill nutzbar ist.",
+     haushalt:"",notiz:""},
+
+    {id:"d17",wd:"Mi",datum:"2.9.",iso:"2026-09-02",woche:"",typ:"aktiv",typLabel:"Aktivtag",
+     fix:[],
+     programm:"Ausflug in der näheren Umgebung.",
+     optA:"Ilsesee Königsbrunn (Planschen am flachen Ufer, Spielplatz mit Holzschiff)",
+     optB:"Waldspielplatz Bobingen-Siedlung (schattig, direkt am Waldrand)",
+     gewaehlt:null,
+     eltern:"Babysitter-Abend 2: Essen gehen in Augsburgs Altstadt.",
+     essen:"Abends seid ihr auswärts. Für die Kinder etwas Einfaches vorbereiten.",
+     haushalt:"Nachfüll-Einkauf auf dem Rückweg.",notiz:""},
+
+    {id:"d18",wd:"Do",datum:"3.9.",iso:"2026-09-03",woche:"",typ:"ruhe",typLabel:"Ruhetag",
+     fix:[],
+     programm:"Pool, freies Spiel, entspannter Tag ganz ohne Programm.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Ruhezeit-Fenster. Abends Whirlpool.",
+     essen:"Reste und Einfaches.",
+     haushalt:"",notiz:""},
+
+    {id:"d19",wd:"Fr",datum:"4.9.",iso:"2026-09-04",woche:"",typ:"aktiv",typLabel:"Aktivtag",
+     fix:[],
+     programm:"Der größere Augsburg-Ausflug. Bei Regen: Königstherme Königsbrunn (Kleinkindbereich „Seesternchenland\").",
+     optA:"Zoo Augsburg (Abenteuerspielplatz, Zoo-Bahn)",
+     optB:"Botanischer Garten Augsburg (Spielplatz, Erlebnispfad der Sinne)",
+     gewaehlt:null,
+     eltern:"Ruhezeit-Fenster nachholen.",
+     essen:"Nichts Verderbliches mehr einkaufen – der Kühlschrank muss morgen leer sein.",
+     haushalt:"",notiz:""},
+
+    {id:"d20",wd:"Sa",datum:"5.9.",iso:"2026-09-05",woche:"",typ:"reise",typLabel:"Abschluss",
+     fix:[],
+     programm:"Übergabe-Tag. Als gemeinsame „Mission erfüllt\" mit der Großen aufziehen, dann letzter Pool-Nachmittag.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Letzter Whirlpool-Abend und kurzer Rückblick auf die drei Wochen.",
+     essen:"Kühlschrank leer essen.",
+     haushalt:"Übergabe-Checkliste abarbeiten (siehe Listen). Koffer für die Heimfahrt packen.",
+     notiz:"Sonntag 6.9. als Puffer zuhause einplanen: Auspacken und Wäsche, bevor die Kita wieder losgeht."},
+
+    {id:"d21",wd:"So",datum:"6.9.",iso:"2026-09-06",woche:"",typ:"puffer",typLabel:"Puffertag",
+     fix:[],
+     programm:"Zuhause auspacken, Wäsche, Kita-Sachen richten. Bewusst nichts vornehmen.",
+     optA:"",optB:"",gewaehlt:null,
+     eltern:"Dieser Tag nimmt den Druck vom ersten Kita-Morgen am Montag.",
+     essen:"Etwas ganz Einfaches oder bestellen.",
+     haushalt:"Wäsche, Koffer leeren, Kühlschrank wieder füllen.",
+     notiz:""}
+  ],
+
+  rhythmus:{
+    ruhe:[
+      {z:"07:00–07:30",k:"Aufstehen & gemeinsames Frühstück",e:""},
+      {z:"08:30–11:30",k:"Vormittag: Garten, Spielplatz, freies Spiel, kleine Förderspiele",e:""},
+      {z:"11:30–12:30",k:"Mittagessen",e:""},
+      {z:"12:30–13:15",k:"Ruhezeit-Fenster. Die Kleine schläft, die Große hat ihre Stille-Zeit: Hörspiel oder Bilderbuch in der Kuschelecke, Sanduhr als Signal.",e:"Eure Zeit als Paar – kein Haushalt, kein Handy",stern:true},
+      {z:"13:15–16:00",k:"Ruhiger Nachmittag: freies Spiel, Pool (Bobingen), kleine Aktivität",e:""},
+      {z:"16:00–17:00",k:"Spaziergang, Spielplatz oder Snack",e:""},
+      {z:"17:30–18:30",k:"Abendessen",e:""},
+      {z:"18:30–19:30",k:"Abendritual: Baden, Buch, Bett",e:""},
+      {z:"ab 19:30",k:"10-Min-Reset: Spielzeug weg, Küche kurz aufräumen",e:"Danach Elternzeit / Whirlpool in Bobingen"}
+    ],
+    aktiv:[
+      {z:"07:00",k:"Aufstehen, zügiges Frühstück",e:""},
+      {z:"09:00–09:30",k:"Aufbruch – so timen, dass die Kleine unterwegs im Auto oder in der Trage einschläft",e:""},
+      {z:"bis 13/14 Uhr",k:"Vor Ort. Rechtzeitig zurück, bevor Übermüdung und Reizüberflutung einsetzen.",e:""},
+      {z:"Nachmittag",k:"Ruhezeit-Fenster nachholen, auch wenn es kürzer ausfällt",e:"Euer Fenster – kürzer, aber konsequent",stern:true},
+      {z:"Abend",k:"Abendritual wie gewohnt",e:""}
+    ]
+  },
+
+  einkauf:[
+    {id:"e1",titel:"Lieferung 1",wann:"Bestellen Fr 14.8. · Liefertermin Sa 16.8.",
+     hinweis:"Deckt Mo 17. bis Do 20.8. ab. Muss vor dem 17. stehen – am Montag seid ihr ganztags weg.",
+     posten:[
+       {id:"p1",t:"Nudeln, Sahne/Kochcreme, junger Gouda (kein Parmesan)",ok:false},
+       {id:"p2",t:"Hähnchenbrust oder Zucchini & Karotten, Kartoffeln",ok:false},
+       {id:"p3",t:"Brot/Semmeln (Mo + Mi frisch), Butter, Frischkäse",ok:false},
+       {id:"p4",t:"Aufschnitt – frische Ware, keine Salami oder Rohwurst",ok:false},
+       {id:"p5",t:"Milch, Joghurt, Eier, Haferflocken",ok:false},
+       {id:"p6",t:"Obst: Äpfel, Birnen, Beeren · Gemüse für Beilagen",ok:false},
+       {id:"p7",t:"Kinder-Snacks: Reiswaffeln, Maiswaffeln, Obstriegel",ok:false},
+       {id:"p8",t:"Brotdosen-Füllung + Trinkflaschen-Nachschub (Mo & Do)",ok:false},
+       {id:"p9",t:"Vorrat: Mehl, Zucker, Backpulver, Vanillezucker, Öl (Kuchen Fr 21.)",ok:false},
+       {id:"p10",t:"Vorrat: Grillkohle, Anzünder, Alufolie, Grillschalen (So 23.)",ok:false}
+     ]},
+    {id:"e2",titel:"Lieferung 2",wann:"Bestellen Mi 19.8. abends · Liefertermin Fr 21.8. vormittags",
+     hinweis:"Deckt den Besuch am Fr 21., die Brotzeit Sa 22. und das Grillen So 23. ab.",
+     posten:[
+       {id:"p11",t:"Frische Sahne, Kaffee, Milch für Gäste, Saft & Schorle",ok:false},
+       {id:"p12",t:"Kuchen-Frischzutaten: Butter, Eier, Zitrone oder Beeren",ok:false},
+       {id:"p13",t:"Brotzeit Oberraith: Semmeln, Käse, Gurke, Obst",ok:false},
+       {id:"p14",t:"Grillfleisch für 6–8 Pers.: Steaks, Hähnchenspieße, frische Bratwurst",ok:false},
+       {id:"p15",t:"Grillgemüse: Zucchini, Paprika, Maiskolben, Champignons",ok:false},
+       {id:"p16",t:"Beilagen: Kartoffeln für Salat, Bauernbrot, Kräuterbutter",ok:false},
+       {id:"p17",t:"Getränke inkl. alkoholfreier Optionen",ok:false},
+       {id:"p18",t:"Für die Kinder: kleine Würstchen, Gurken- & Karottensticks, Obst",ok:false}
+     ]},
+    {id:"e3",titel:"Lieferung 3",wann:"Bestellen Mo 24.8. · Liefertermin Di 25.8.",
+     hinweis:"Normale Wochenversorgung, keine Gäste. Deutlich kleiner. Ab Do 27. bewusst weniger – der Kühlschrank soll bis Fr 28. leer werden.",
+     posten:[
+       {id:"p19",t:"Standard-Basis: Brot, Milchprodukte, Obst, Gemüse",ok:false},
+       {id:"p20",t:"Kinderessen für die Woche",ok:false},
+       {id:"p21",t:"Proviant für den München-Tag Di 25.",ok:false}
+     ]},
+    {id:"e4",titel:"Lieferung 4 – Bobingen",wann:"Bestellen Do 27.8. · Liefertermin Sa 29. oder So 30.8.",
+     hinweis:"Erstausstattung im fremden Haus. Alternativ unterwegs an der A8 stoppen.",
+     posten:[
+       {id:"p22",t:"Frühstück komplett: Brot, Butter, Milch, Müsli, Marmelade",ok:false},
+       {id:"p23",t:"Grundvorräte: Nudeln, Reis, Öl, Salz, Kaffee",ok:false},
+       {id:"p24",t:"Obst, Gemüse, Kinderessen für 2–3 Tage",ok:false},
+       {id:"p25",t:"Getränke in größerer Menge – Pool-Woche, vermutlich heiß",ok:false},
+       {id:"p26",t:"Spülmittel & Müllbeutel – vorher fragen, ob die Schwägerin was dalässt",ok:false}
+     ]},
+    {id:"e5",titel:"Nachfüll-Einkauf",wann:"Mi 2.9. auf dem Rückweg vom Ausflug",
+     hinweis:"Nichts Verderbliches mehr für nach dem 4.9. – der Kühlschrank muss Sa 5.9. leer sein.",
+     posten:[
+       {id:"p27",t:"Frisches für die zweite Wochenhälfte",ok:false},
+       {id:"p28",t:"Getränke nachfüllen",ok:false}
+     ]}
+  ],
+
+  ideen:[
+    {id:"i1",kat:"Für Tilda (1 Jahr) · Sinne & Bewegung",
+     posten:[
+       {id:"n1",nm:"Schüttspiel",dt:"Wasser, Reis oder Nudeln zwischen zwei Schüsseln umfüllen – unter Aufsicht"},
+       {id:"n2",nm:"Fühlsäckchen",dt:"Verschiedene Materialien zum Ertasten: Stoff, Watte, Korken"},
+       {id:"n3",nm:"Stapelbecher & Bauklötze",dt:"Stapeln, umwerfen, wieder stapeln"},
+       {id:"n4",nm:"Krabbel-Parcours",dt:"Sofakissen, Decken und Kissen als Hindernisse"},
+       {id:"n5",nm:"Topf-Trommeln",dt:"Mit Holzlöffeln auf Kochtöpfe"},
+       {id:"n6",nm:"Gießkannen-Spiel",dt:"Becher und Kanne am Beckenrand, außerhalb vom tiefen Wasser"},
+       {id:"n7",nm:"Fingerspiele",dt:"„Kopf-Schulter-Knie-Fuß\", „Häschen in der Grube\" – vereinfacht"},
+       {id:"n8",nm:"Fühlbücher & Spiegel",dt:"Bücher mit Materialien, Spiegelspiele"},
+       {id:"n9",nm:"Naturmaterial entdecken",dt:"Blätter, Kastanien – wegen Mundkontakt immer mit Aufsicht"}
+     ]},
+    {id:"i2",kat:"Für die Große (3 Jahre) · Fördern & Fantasie",
+     posten:[
+       {id:"n10",nm:"Memory",dt:"Erstes Brettspiel, einfache Version mit wenigen Bildpaaren"},
+       {id:"n11",nm:"Obstgarten",dt:"Kooperatives Spiel, alle gewinnen zusammen"},
+       {id:"n12",nm:"Rollenspiele",dt:"Kaufmannsladen, Arzt- und Tierarztspiel, Verkleidekiste"},
+       {id:"n13",nm:"Forscher-Tasche",dt:"Eigene Becherlupe, Becher und Kescher zum Insekten entdecken"},
+       {id:"n14",nm:"Wasserfarben & Kneten",dt:"Malen, Stempeln, erste Übungen mit der Kinderschere"},
+       {id:"n15",nm:"Hindernisparcours",dt:"Im Garten aufbauen, dazu Ballspiele und Stopptanz"},
+       {id:"n16",nm:"Schatzsuche",dt:"Einfache Symbol-Hinweise als Karte"},
+       {id:"n17",nm:"Reim- & Zählspiele",dt:"„Ich packe meinen Koffer\" vereinfacht, Abzählreime"}
+     ]},
+    {id:"i3",kat:"Gemeinsam · beide Schwestern",
+     posten:[
+       {id:"n18",nm:"Kissenburg bauen",dt:"Mit Decken, Stühlen und Kissen – hält erfahrungsgemäß lange"},
+       {id:"n19",nm:"Musik & Tanzparty",dt:"Playlist an, gemeinsam abzappeln"},
+       {id:"n20",nm:"Verstecken & Fangen",dt:"Einfache Version, die für beide Altersstufen funktioniert"},
+       {id:"n21",nm:"Gemeinsam bauen",dt:"Große Bausteine oder Duplo, beide haben eine Rolle"},
+       {id:"n22",nm:"Backen",dt:"Plätzchen ausstechen, Teig rühren – jede bekommt eine Aufgabe"}
+     ]},
+    {id:"i4",kat:"Autofahrt · nach & von Bobingen",
+     posten:[
+       {id:"n23",nm:"Kinderlieder-Playlist",dt:"Vorab zusammenstellen, offline verfügbar machen"},
+       {id:"n24",nm:"Reise-Überraschung",dt:"Ein neues kleines Spielzeug erst im Auto auspacken lassen"},
+       {id:"n25",nm:"Stickerbuch",dt:"Für die Große, beschäftigt zuverlässig lange"},
+       {id:"n26",nm:"Snackbox mit Fächern",dt:"Kleine Portionen, Trinkflasche gut erreichbar"}
+     ]},
+    {id:"i5",kat:"Pool · Bobingen-Woche",
+     posten:[
+       {id:"n27",nm:"Tauchringe suchen",dt:"Nur im Flachen und unter Aufsicht – für die Große"},
+       {id:"n28",nm:"Wasserball & Schwimmtiere",dt:"Klassiker, funktioniert für beide"},
+       {id:"n29",nm:"Boote schwimmen lassen",dt:"Aus Plastikbechern oder Korken"},
+       {id:"n30",nm:"Gießkannen am Rand",dt:"Für Tilda: gießen, füllen, schütten"}
+     ]},
+    {id:"i6",kat:"Regentag-Joker · überall einsetzbar",
+     posten:[
+       {id:"n31",nm:"Schattentheater",dt:"Taschenlampe an die Wand, Figuren mit den Händen erfinden"},
+       {id:"n32",nm:"Tast-Memory",dt:"Gegenstände im Stoffbeutel erraten"},
+       {id:"n33",nm:"Indoor-Picknick",dt:"Decke im Wohnzimmer – macht ein normales Essen zum Ereignis"},
+       {id:"n34",nm:"Bewegungslieder drinnen",dt:"Zum Abzappeln, wenn der Garten ausfällt"}
+     ]}
+  ],
+
+  listen:[
+    {id:"l1",titel:"Packen für Bobingen",
+     posten:[
+       {id:"k1",t:"Reisebett / Beistellbett",ok:false},
+       {id:"k2",t:"Babyphone",ok:false},
+       {id:"k3",t:"Gewohnte Schlaf-Utensilien (Kuscheltier, Schlafsack)",ok:false},
+       {id:"k4",t:"Erste-Hilfe-Set & Fieberthermometer",ok:false},
+       {id:"k5",t:"Lieblingskuscheltiere beider Kinder",ok:false},
+       {id:"k6",t:"Schwimmwindeln & Schwimmhilfen",ok:false},
+       {id:"k7",t:"Sonnenschutz: Creme, Hüte",ok:false},
+       {id:"k8",t:"Handtücher für Pool und Bad",ok:false},
+       {id:"k9",t:"Vertraute Spielsachen, kleine Auswahl",ok:false},
+       {id:"k10",t:"1–2 Überraschungs-Spielzeuge für die Autofahrt",ok:false},
+       {id:"k11",t:"Grundnahrungsmittel oder Lieferung vorbestellt",ok:false},
+       {id:"k12",t:"Medikamente: Fieber, Schmerzen, Erkältung",ok:false}
+     ]},
+    {id:"l2",titel:"Mit der Schwägerin klären",
+     posten:[
+       {id:"k13",t:"Pflanzen-Gießplan",ok:false},
+       {id:"k14",t:"Pool- & Whirlpool-Pflege (Chemie, Abdeckung)",ok:false},
+       {id:"k15",t:"Mülltermine & Mülltrennung",ok:false},
+       {id:"k16",t:"Schlüsselübergabe",ok:false},
+       {id:"k17",t:"Notfallkontakte: Schwägerin, Handwerker, Arzt vor Ort",ok:false},
+       {id:"k18",t:"WLAN-Zugangsdaten",ok:false},
+       {id:"k19",t:"Haustierpflege, falls vorhanden",ok:false},
+       {id:"k20",t:"Ist Spülmittel & Müllbeutel da oder mitbringen?",ok:false}
+     ]},
+    {id:"l3",titel:"Rückgabe & Abreise Sa 5.9.",
+     posten:[
+       {id:"k21",t:"Pool & Whirlpool säubern und abdecken",ok:false},
+       {id:"k22",t:"Pflanzen ein letztes Mal gießen",ok:false},
+       {id:"k23",t:"Kühlschrank komplett leeren",ok:false},
+       {id:"k24",t:"Müll rausbringen",ok:false},
+       {id:"k25",t:"Alle Räume durchgehen – etwas vergessen?",ok:false},
+       {id:"k26",t:"Türen & Fenster schließen",ok:false},
+       {id:"k27",t:"Dankesnotiz und kleines Mitbringsel hinterlassen",ok:false},
+       {id:"k28",t:"Eigene Koffer und Taschen",ok:false}
+     ]},
+    {id:"l4",titel:"Haushaltsplan · Einkaufen & Putzen",
+     posten:[
+       {id:"k29",t:"Fr 14.8. – Lieferung 1 bestellen (kommt Sa 16.8.)",ok:false},
+       {id:"k30",t:"Mi 19.8. – Lieferung 2 bestellen (kommt Fr 21.8.)",ok:false},
+       {id:"k31",t:"Mo 24.8. – Lieferung 3 bestellen (kommt Di 25.8.)",ok:false},
+       {id:"k32",t:"Mi 26.8. – Wochenputz vormittags, 45 Min",ok:false},
+       {id:"k33",t:"Do 27.8. – Lieferung 4 für Bobingen bestellen",ok:false},
+       {id:"k34",t:"Fr 28.8. – Großes Packen",ok:false},
+       {id:"k35",t:"Mo 31.8. – Kurzer Putz-Block in Bobingen",ok:false},
+       {id:"k36",t:"Mi 2.9. – Nachfüll-Einkauf auf dem Rückweg",ok:false},
+       {id:"k37",t:"Sa 5.9. – Haus übergabefertig machen",ok:false},
+       {id:"k38",t:"So 6.9. – Puffertag: Auspacken & Wäsche",ok:false}
+     ]}
+  ],
+
+  merken:[
+    {id:"m1",art:"warn",text:"<strong>Whirlpool:</strong> für beide Kinder nicht geeignet – Kinder überhitzen deutlich schneller als Erwachsene. Bleibt euer Abend-Ritual als Paar, wenn die Kinder schlafen."},
+    {id:"m2",art:"warn",text:"<strong>Pool:</strong> bei Tilda immer „Hand in Reichweite\", auch mit Schwimmhilfen."},
+    {id:"m3",art:"tipp",text:"<strong>Woche 1 ist keine Retreat-Woche.</strong> An allen sieben Tagen liegt mindestens ein fixer Termin. Nichts zusätzlich draufpacken – nur Ruhezeit-Fenster und Abendritual schützen."},
+    {id:"m4",art:"tipp",text:"<strong>Ruhezeit statt Mittagsschlaf:</strong> Die Große bekommt 30–45 Min. allein in ihrer Kuschelecke mit Hörspiel oder Bilderbuch. Kein Schlafzwang, aber auch keine tägliche Neuverhandlung. Sanduhr als Signal."},
+    {id:"m5",art:"tipp",text:"<strong>Aufgaben vorab aufteilen</strong> statt jeden Tag neu verhandeln: wer kocht, wer räumt, an welchen Tagen."},
+    {id:"m6",art:"tipp",text:"<strong>Beim Grillen und bei Kaffee & Kuchen</strong> jeweils eine Komponente einplanen, die für Daniel passt – sonst sitzt er bei jedem Besuchstermin daneben."}
+  ]
+};
+
+/* ══ Zustand ══ */
+const SCHLUESSEL='retreat-2026';
+let D, aktiverTag=0, aktiverTab='plan';
+
+function tiefKopie(o){return JSON.parse(JSON.stringify(o))}
+
+function laden(){
+  const roh=Speicher.lies(SCHLUESSEL);
+  if(!roh){D=tiefKopie(START);return}
+  try{
+    const g=JSON.parse(roh);
+    D = (g.version===START.version) ? g : verschmelzen(g);
+  }catch(e){D=tiefKopie(START)}
+}
+
+/* Bei neuer Datenversion: eigene Änderungen retten, neue Felder ergänzen */
+function verschmelzen(alt){
+  const neu=tiefKopie(START);
+  if(Array.isArray(alt.tage)) alt.tage.forEach(at=>{
+    const nt=neu.tage.find(t=>t.id===at.id);
+    if(nt && at.gewaehlt!=null) nt.gewaehlt=at.gewaehlt;
+  });
+  ['einkauf','listen'].forEach(feld=>{
+    if(!Array.isArray(alt[feld]))return;
+    alt[feld].forEach(ag=>{
+      const ng=neu[feld].find(g=>g.id===ag.id);
+      if(!ng||!Array.isArray(ag.posten))return;
+      ag.posten.forEach(ap=>{
+        const np=ng.posten.find(p=>p.id===ap.id);
+        if(np&&ap.ok) np.ok=true;
+      });
+    });
+  });
+  return neu;
+}
+
+function sichern(){
+  Speicher.schreib(SCHLUESSEL,JSON.stringify(D));
+}
+function neueId(){return 'x'+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function esc(s){return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+
+function melde(txt){
+  const t=document.getElementById('toast');
+  t.textContent=txt;t.classList.add('zeig');
+  clearTimeout(t._z);t._z=setTimeout(()=>t.classList.remove('zeig'),1900);
+}
+
+/* ══ Editor ══ */
+let edSpeichern=null;
+function bearbeite(titel,felder,beiSpeichern){
+  const box=document.getElementById('editor');
+  document.getElementById('ed-titel').textContent=titel;
+  const ziel=document.getElementById('ed-felder');
+  ziel.innerHTML=felder.map((f,i)=>
+    `<label for="edf${i}">${esc(f.label)}</label>`+
+    (f.zeilen===1
+      ? `<input id="edf${i}" type="text" value="${esc(f.wert)}">`
+      : `<textarea id="edf${i}" rows="${f.zeilen||4}">${esc(f.wert)}</textarea>`)
+  ).join('');
+  edSpeichern=()=>{
+    const werte=felder.map((f,i)=>document.getElementById('edf'+i).value);
+    beiSpeichern(werte);sichern();zeichne();
+  };
+  box.hidden=false;
+  setTimeout(()=>{const e=document.getElementById('edf0');if(e){e.focus();
+    if(e.setSelectionRange){const l=e.value.length;e.setSelectionRange(l,l)}}},60);
+}
+function editorZu(){document.getElementById('editor').hidden=true;edSpeichern=null}
+
+document.getElementById('ed-speichern').onclick=()=>{if(edSpeichern)edSpeichern();editorZu()};
+document.getElementById('ed-abbrechen').onclick=editorZu;
+document.getElementById('editor').onclick=e=>{if(e.target.id==='editor')editorZu()};
+
+/* ══ Bausteine ══ */
+function feld(titel,wert,klasse,beiKlick){
+  const leer=!String(wert||'').trim();
+  return `<div class="feld ${klasse||''}">
+    <div class="feld-titel">${esc(titel)}</div>
+    <div class="feld-wert ${leer?'leer':''}" tabindex="0" data-klick="${beiKlick}">${leer?'Tippen zum Ergänzen':esc(wert)}</div>
+  </div>`;
+}
+
+function hakenPunkt(gid,p,typ){
+  return `<li class="haken ${p.ok?'fertig':''}">
+    <span class="box" data-klick="haken:${typ}:${gid}:${p.id}">${p.ok?'✓':''}</span>
+    <span class="haken-txt" data-klick="hakenTxt:${typ}:${gid}:${p.id}">${esc(p.t)}</span>
+    <button class="weg" data-klick="hakenWeg:${typ}:${gid}:${p.id}" aria-label="Löschen">×</button>
+  </li>`;
+}
+
+/* ══ Tab: Plan ══ */
+function zeichnePlan(){
+  const t=D.tage[aktiverTag];
+  const el=document.getElementById('tab-plan');
+  let h='';
+
+  if(t.woche) h+=`<div class="woche-band">${esc(t.woche)}</div>`;
+
+  h+=`<article class="karte tagkarte">
+    <div class="karte-kopf">
+      <div class="datum">
+        <span class="gross">${esc(t.datum)}</span>
+        <span class="wd">${esc(t.wd)}</span>
+      </div>
+      <span class="plakette p-${t.typ}" data-klick="typ:${t.id}">${esc(t.typLabel)}</span>
+    </div>
+    <div class="karte-koerper">`;
+
+  /* Fixtermine */
+  h+=`<div class="feld"><div class="feld-titel">Feste Termine</div>`;
+  if(t.fix.length){
+    h+=`<ul class="fix-liste">`+t.fix.map(f=>`
+      <li class="fix">
+        <span class="zeit" data-klick="fix:${t.id}:${f.id}">${esc(f.zeit)}</span>
+        <span class="txt" data-klick="fix:${t.id}:${f.id}">
+          <span class="t">${esc(f.titel)}</span>
+          ${f.notiz?`<span class="n">${esc(f.notiz)}</span>`:''}
+        </span>
+        <button class="weg" data-klick="fixWeg:${t.id}:${f.id}" aria-label="Termin löschen">×</button>
+      </li>`).join('')+`</ul>`;
+  }else{
+    h+=`<div class="feld-wert leer" style="cursor:default">Keine festen Termine</div>`;
+  }
+  h+=`<button class="knopf plus" data-klick="fixNeu:${t.id}">+ Termin hinzufügen</button></div>`;
+
+  h+=feld('Programm',t.programm,'',`text:${t.id}:programm:Programm`);
+
+  /* Optionen */
+  if(t.optA||t.optB){
+    h+=`<div class="feld"><div class="feld-titel">Wahl für den Tag</div>`;
+    ['A','B'].forEach(b=>{
+      const w=t['opt'+b];if(!w)return;
+      const an=t.gewaehlt===b;
+      h+=`<div class="opt ${an?'gewaehlt':''}" data-klick="waehle:${t.id}:${b}">
+        <span class="mark">${an?'✓':''}</span>
+        <span class="opt-txt">
+          <span class="lbl">Option ${b}</span><br>${esc(w)}
+        </span>
+      </div>`;
+    });
+    h+=`<button class="knopf plus klein" data-klick="optBearb:${t.id}">Optionen bearbeiten</button></div>`;
+  }else{
+    h+=`<button class="knopf plus klein" data-klick="optBearb:${t.id}">+ Optionen A / B anlegen</button>`;
+  }
+
+  h+=feld('Eltern-Moment',t.eltern,'eltern',`text:${t.id}:eltern:Eltern-Moment`);
+  h+=feld('Essen',t.essen,'',`text:${t.id}:essen:Essen`);
+  h+=feld('Haushalt',t.haushalt,'',`text:${t.id}:haushalt:Haushalt`);
+  if(String(t.notiz||'').trim()){
+    h+=feld('Achtung',t.notiz,'notiz',`text:${t.id}:notiz:Achtung`);
+  }else{
+    h+=`<button class="knopf plus klein" data-klick="text:${t.id}:notiz:Achtung">+ Hinweis für diesen Tag</button>`;
+  }
+
+  h+=`</div></article>`;
+
+  /* Rhythmus passend zum Tagestyp */
+  const art=(t.typ==='aktiv'||t.typ==='besuch')?'aktiv':'ruhe';
+  const rl=D.rhythmus[art];
+  h+=`<article class="karte">
+    <div class="karte-kopf"><h2>Tagesrhythmus · ${art==='aktiv'?'Aktivtag':'Ruhetag'}</h2></div>
+    <div class="karte-koerper">`+
+    rl.map((r,i)=>`<div class="rhy ${r.stern?'stern':''}">
+      <span class="z">${esc(r.z)}</span>
+      <span class="k" data-klick="rhy:${art}:${i}">${esc(r.k)}
+        ${r.e?`<span class="e">${esc(r.e)}</span>`:''}
+      </span>
+    </div>`).join('')+
+    `</div></article>`;
+
+  el.innerHTML=h;
+}
+
+/* ══ Tab: Einkauf ══ */
+function zeichneEinkauf(){
+  const el=document.getElementById('tab-einkauf');
+  el.innerHTML=D.einkauf.map(g=>{
+    const fertig=g.posten.filter(p=>p.ok).length;
+    return `<article class="karte">
+      <div class="karte-kopf">
+        <div>
+          <h2 data-klick="grpTitel:einkauf:${g.id}">${esc(g.titel)}</h2>
+          <div class="mini" data-klick="grpWann:${g.id}">${esc(g.wann)}</div>
+        </div>
+        <span class="plakette ${fertig===g.posten.length&&g.posten.length?'p-aktiv':'p-ruhe'}">${fertig}/${g.posten.length}</span>
+      </div>
+      <div class="karte-koerper">
+        ${g.hinweis?`<div class="hinweis" data-klick="grpHinweis:${g.id}">${esc(g.hinweis)}</div>`:''}
+        <ul class="hakenliste">${g.posten.map(p=>hakenPunkt(g.id,p,'einkauf')).join('')}</ul>
+        <button class="knopf plus" data-klick="hakenNeu:einkauf:${g.id}">+ Posten hinzufügen</button>
+      </div>
+    </article>`;
+  }).join('')+
+  `<div class="knopf-reihe"><button class="knopf" data-klick="einkaufKopieren" style="flex:1">Offene Posten kopieren</button></div>`;
+}
+
+/* ══ Tab: Kalenderblatt ══ */
+const kurz=(s,n)=>{s=String(s||'').trim();return s.length>n?s.slice(0,n-1).trimEnd()+'…':s};
+
+const KB_WOCHEN=[
+  {von:0, label:'17. – 23.<br>August',      phase:'Besuchswoche'},
+  {von:7, label:'24. – 30.<br>August',      phase:'Retreat &<br>Anreise'},
+  {von:14,label:'31.8. – 6.<br>September',  phase:'Bobingen'}
+];
+const KB_LEGENDE=[
+  ['var(--wiese)','Aktivtag'],['var(--wasser)','Ruhetag'],['var(--sonne)','Besuch'],
+  ['var(--alarm)','Volltag'],['#7B6BA8','Reise'],['#B6C2C3','Puffer']
+];
+
+function kbZelle(t){
+  if(!t) return '<td></td>';
+  const gewaehlt = t.gewaehlt ? t['opt'+t.gewaehlt] : '';
+  const text = gewaehlt || t.programm;
+  return `<td><div class="kb-zelle kb-t-${t.typ}" data-klick="ausBlatt:${t.id}">
+    <div class="kb-band"></div>
+    <div class="kb-inhalt">
+      <div class="kb-datum">
+        <span class="n">${esc(t.datum)}</span>
+        <span class="m">${esc(t.wd)}</span>
+      </div>
+      <div class="kb-typ">${esc(t.typLabel)}</div>
+      ${t.fix.map(f=>`<div class="kb-fix"><b>${esc(kurz(f.zeit,11))}</b><span>${esc(kurz(f.titel,42))}</span></div>`).join('')}
+      ${text?`<div class="kb-abschnitt">${esc(kurz(text,124))}</div>`:''}
+      ${t.eltern?`<div class="kb-abschnitt kb-eltern"><span class="kb-marke">Eltern</span>${esc(kurz(t.eltern,90))}</div>`:''}
+      ${t.haushalt?`<div class="kb-abschnitt kb-haus"><span class="kb-marke">Haushalt</span>${esc(kurz(t.haushalt,78))}</div>`:''}
+    </div>
+  </div></td>`;
+}
+
+function zeichneBlatt(){
+  const kopf=['Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag','Sonntag'];
+  const zeilen=KB_WOCHEN.map((w,i)=>
+    (i?'<tr class="kb-luft"><td colspan="8"></td></tr>':'')+
+    `<tr>
+      <td class="kb-rand">
+        <div class="rg">${w.label}</div>
+        <div class="ph">${w.phase}</div>
+      </td>
+      ${Array.from({length:7},(_,k)=>kbZelle(D.tage[w.von+k])).join('')}
+    </tr>`).join('');
+
+  document.getElementById('tab-blatt').innerHTML=`
+    <div class="blatt-werkzeug">
+      <button class="knopf voll" data-klick="druck">Drucken / als PDF sichern</button>
+      <span class="mini" style="margin:0">Quer, A4 – auf dem iPhone über Teilen &rarr; Drucken</span>
+    </div>
+    <div class="blatt-rolle">
+      <div id="kalenderblatt">
+        <div class="kb-kopf">
+          <h2>Familien-Retreat</h2>
+          <span class="sp">17. August – 6. September 2026</span>
+        </div>
+        <table class="kb-tab">
+          <thead><tr>
+            <th class="kb-rand"></th>
+            ${kopf.map(d=>`<th>${d}</th>`).join('')}
+          </tr></thead>
+          <tbody>${zeilen}</tbody>
+        </table>
+        <div class="kb-fuss">
+          <div class="kb-leg">
+            ${KB_LEGENDE.map(([f,l])=>`<span><i style="background:${f}"></i>${l}</span>`).join('')}
+          </div>
+          <div class="kb-notizen">
+            <b>Täglich 12:30–13:15 Ruhezeit-Fenster</b> – die Kleine schläft, die Große hat Stille-Zeit.
+            <b>Whirlpool nur für Eltern</b>, abends wenn die Kinder schlafen.
+            <b>Babysitter-Abende:</b> Do 27.8. und Mi 2.9.
+            <b>Lieferungen:</b> Sa 16.8. · Fr 21.8. · Di 25.8. · Sa 29.8. · Mi 2.9.
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+/* ══ Tab: Ideen ══ */
+function zeichneIdeen(){
+  const el=document.getElementById('tab-ideen');
+  el.innerHTML=D.ideen.map(g=>`
+    <article class="karte">
+      <div class="karte-kopf"><h2 data-klick="ideeKat:${g.id}">${esc(g.kat)}</h2></div>
+      <div class="karte-koerper">
+        ${g.posten.map(p=>`<div class="idee">
+          <span class="idee-txt" data-klick="idee:${g.id}:${p.id}">
+            <span class="nm">${esc(p.nm)}</span>
+            <span class="dt">${esc(p.dt)}</span>
+          </span>
+          <button class="weg" data-klick="ideeWeg:${g.id}:${p.id}" aria-label="Löschen">×</button>
+        </div>`).join('')}
+        <button class="knopf plus" data-klick="ideeNeu:${g.id}">+ Idee hinzufügen</button>
+      </div>
+    </article>`).join('');
+}
+
+/* ══ Tab: Listen ══ */
+function zeichneListen(){
+  const el=document.getElementById('tab-listen');
+  el.innerHTML=D.listen.map(g=>{
+    const fertig=g.posten.filter(p=>p.ok).length;
+    return `<article class="karte">
+      <div class="karte-kopf">
+        <h2 data-klick="grpTitel:listen:${g.id}">${esc(g.titel)}</h2>
+        <span class="plakette ${fertig===g.posten.length&&g.posten.length?'p-aktiv':'p-ruhe'}">${fertig}/${g.posten.length}</span>
+      </div>
+      <div class="karte-koerper">
+        <ul class="hakenliste">${g.posten.map(p=>hakenPunkt(g.id,p,'listen')).join('')}</ul>
+        <button class="knopf plus" data-klick="hakenNeu:listen:${g.id}">+ Punkt hinzufügen</button>
+      </div>
+    </article>`;
+  }).join('');
+}
+
+/* ══ Tab: Mehr ══ */
+function zeichneInfo(){
+  const el=document.getElementById('tab-info');
+  el.innerHTML=`
+    <article class="karte">
+      <div class="karte-kopf"><h2>Merken</h2></div>
+      <div class="karte-koerper">
+        ${D.merken.map(m=>`<div class="hinweis ${m.art==='warn'?'warn':''}" data-klick="merk:${m.id}">${m.text}</div>`).join('')}
+        <button class="knopf plus" data-klick="merkNeu">+ Hinweis hinzufügen</button>
+      </div>
+    </article>
+
+    <article class="karte">
+      <div class="karte-kopf"><h2>Stand teilen</h2></div>
+      <div class="karte-koerper">
+        <p style="margin:0 0 10px">Änderungen werden nur auf diesem Gerät gespeichert. Zum Abgleichen exportiert ihr eine Datei und ladet sie auf dem anderen Handy.</p>
+        <div class="knopf-reihe">
+          <button class="knopf voll" data-klick="export" style="flex:1">Stand exportieren</button>
+          <button class="knopf" data-klick="import" style="flex:1">Stand laden</button>
+        </div>
+        <input type="file" id="datei" accept="application/json" hidden>
+        <p class="mini" id="speicher-info"></p>
+      </div>
+    </article>
+
+    <article class="karte">
+      <div class="karte-kopf"><h2>Zurücksetzen</h2></div>
+      <div class="karte-koerper">
+        <p style="margin:0 0 10px">Setzt alle Texte, Haken und Auswahlen auf den Ausgangsplan zurück.</p>
+        <button class="knopf gefahr" data-klick="reset">Auf Ausgangsplan zurücksetzen</button>
+      </div>
+    </article>`;
+  const si=document.getElementById('speicher-info');
+  if(si) si.textContent = Speicher.dauerhaft
+    ? 'Änderungen bleiben auf diesem Gerät gespeichert.'
+    : 'Achtung: Dieser Browser blockiert dauerhaftes Speichern. Änderungen gehen beim Schließen verloren.';
+}
+
+/* ══ Bahnen ══ */
+function zeichneBahnen(){
+  const heute=new Date().toISOString().slice(0,10);
+  document.getElementById('bahnen').innerHTML=D.tage.map((t,i)=>
+    `<button class="bahn ${i===aktiverTag?'aktiv-tag':''} ${t.iso===heute?'heute':''}"
+       data-t="${t.typ}" data-klick="tag:${i}">
+      <span class="wd">${esc(t.wd)}</span>
+      <span class="dt">${esc(t.datum.replace(/\.$/,''))}</span>
+      <span class="balken"></span>
+    </button>`).join('');
+  if(aktiverTab!=='plan')return;
+  const a=document.querySelector('.bahn.aktiv-tag');
+  if(a) a.scrollIntoView({block:'nearest',inline:'center',behavior:'smooth'});
+}
+
+function zeichne(){
+  zeichneBahnen();
+  ({plan:zeichnePlan,blatt:zeichneBlatt,einkauf:zeichneEinkauf,ideen:zeichneIdeen,
+    listen:zeichneListen,info:zeichneInfo})[aktiverTab]();
+}
+
+/* ══ Klicks ══ */
+function finde(arr,id){return arr.find(x=>x.id===id)}
+
+document.addEventListener('click',e=>{
+  const ziel=e.target.closest('[data-klick]');
+  if(!ziel)return;
+  const [befehl,...a]=ziel.dataset.klick.split(':');
+  const tag=id=>finde(D.tage,id);
+
+  switch(befehl){
+    case 'tag': aktiverTag=+a[0]; zeichne(); window.scrollTo({top:0,behavior:'smooth'}); break;
+
+    case 'text':{
+      const t=tag(a[0]),f=a[1];
+      bearbeite(a[2],[{label:a[2],wert:t[f],zeilen:5}],v=>{t[f]=v[0].trim()});
+      break;}
+
+    case 'typ':{
+      const t=tag(a[0]);
+      bearbeite('Tages-Etikett',[{label:'Etikett',wert:t.typLabel,zeilen:1}],v=>{
+        t.typLabel=v[0].trim()||t.typLabel});
+      break;}
+
+    case 'fix':{
+      const t=tag(a[0]),f=finde(t.fix,a[1]);
+      bearbeite('Termin bearbeiten',[
+        {label:'Uhrzeit',wert:f.zeit,zeilen:1},
+        {label:'Termin',wert:f.titel,zeilen:1},
+        {label:'Hinweis',wert:f.notiz,zeilen:2}
+      ],v=>{f.zeit=v[0].trim();f.titel=v[1].trim();f.notiz=v[2].trim()});
+      break;}
+
+    case 'fixNeu':{
+      const t=tag(a[0]);
+      bearbeite('Neuer Termin',[
+        {label:'Uhrzeit',wert:'',zeilen:1},
+        {label:'Termin',wert:'',zeilen:1},
+        {label:'Hinweis',wert:'',zeilen:2}
+      ],v=>{if(v[1].trim())t.fix.push({id:neueId(),zeit:v[0].trim()||'—',titel:v[1].trim(),notiz:v[2].trim()})});
+      break;}
+
+    case 'fixWeg':{
+      const t=tag(a[0]);
+      t.fix=t.fix.filter(f=>f.id!==a[1]);sichern();zeichne();melde('Termin gelöscht');
+      break;}
+
+    case 'waehle':{
+      const t=tag(a[0]);
+      t.gewaehlt = t.gewaehlt===a[1] ? null : a[1];
+      sichern();zeichne();
+      break;}
+
+    case 'optBearb':{
+      const t=tag(a[0]);
+      bearbeite('Optionen',[
+        {label:'Option A',wert:t.optA,zeilen:3},
+        {label:'Option B',wert:t.optB,zeilen:3}
+      ],v=>{t.optA=v[0].trim();t.optB=v[1].trim();
+            if(!t.optA&&t.gewaehlt==='A')t.gewaehlt=null;
+            if(!t.optB&&t.gewaehlt==='B')t.gewaehlt=null});
+      break;}
+
+    case 'rhy':{
+      const r=D.rhythmus[a[0]][+a[1]];
+      bearbeite('Zeitblock',[
+        {label:'Uhrzeit',wert:r.z,zeilen:1},
+        {label:'Kinder & Familie',wert:r.k,zeilen:3},
+        {label:'Eltern-Moment',wert:r.e,zeilen:2}
+      ],v=>{r.z=v[0].trim();r.k=v[1].trim();r.e=v[2].trim()});
+      break;}
+
+    case 'haken':{
+      const g=finde(D[a[0]],a[1]),p=finde(g.posten,a[2]);
+      p.ok=!p.ok;sichern();zeichne();
+      break;}
+
+    case 'hakenTxt':{
+      const g=finde(D[a[0]],a[1]),p=finde(g.posten,a[2]);
+      bearbeite('Eintrag',[{label:'Text',wert:p.t,zeilen:2}],v=>{p.t=v[0].trim()||p.t});
+      break;}
+
+    case 'hakenWeg':{
+      const g=finde(D[a[0]],a[1]);
+      g.posten=g.posten.filter(p=>p.id!==a[2]);sichern();zeichne();melde('Gelöscht');
+      break;}
+
+    case 'hakenNeu':{
+      const g=finde(D[a[0]],a[1]);
+      bearbeite('Neuer Eintrag',[{label:'Text',wert:'',zeilen:2}],v=>{
+        if(v[0].trim())g.posten.push({id:neueId(),t:v[0].trim(),ok:false})});
+      break;}
+
+    case 'grpTitel':{
+      const g=finde(D[a[0]],a[1]);
+      bearbeite('Überschrift',[{label:'Überschrift',wert:g.titel,zeilen:1}],v=>{g.titel=v[0].trim()||g.titel});
+      break;}
+
+    case 'grpWann':{
+      const g=finde(D.einkauf,a[0]);
+      bearbeite('Zeitpunkt',[{label:'Wann',wert:g.wann,zeilen:2}],v=>{g.wann=v[0].trim()});
+      break;}
+
+    case 'grpHinweis':{
+      const g=finde(D.einkauf,a[0]);
+      bearbeite('Hinweis',[{label:'Hinweis',wert:g.hinweis,zeilen:3}],v=>{g.hinweis=v[0].trim()});
+      break;}
+
+    case 'idee':{
+      const g=finde(D.ideen,a[0]),p=finde(g.posten,a[1]);
+      bearbeite('Idee',[
+        {label:'Name',wert:p.nm,zeilen:1},
+        {label:'Beschreibung',wert:p.dt,zeilen:3}
+      ],v=>{p.nm=v[0].trim()||p.nm;p.dt=v[1].trim()});
+      break;}
+
+    case 'ideeNeu':{
+      const g=finde(D.ideen,a[0]);
+      bearbeite('Neue Idee',[
+        {label:'Name',wert:'',zeilen:1},
+        {label:'Beschreibung',wert:'',zeilen:3}
+      ],v=>{if(v[0].trim())g.posten.push({id:neueId(),nm:v[0].trim(),dt:v[1].trim()})});
+      break;}
+
+    case 'ideeWeg':{
+      const g=finde(D.ideen,a[0]);
+      g.posten=g.posten.filter(p=>p.id!==a[1]);sichern();zeichne();melde('Gelöscht');
+      break;}
+
+    case 'ideeKat':{
+      const g=finde(D.ideen,a[0]);
+      bearbeite('Kategorie',[{label:'Kategorie',wert:g.kat,zeilen:1}],v=>{g.kat=v[0].trim()||g.kat});
+      break;}
+
+    case 'merk':{
+      const m=finde(D.merken,a[0]);
+      bearbeite('Hinweis',[{label:'Text',wert:m.text.replace(/<[^>]+>/g,''),zeilen:4}],v=>{m.text=esc(v[0].trim())});
+      break;}
+
+    case 'merkNeu':
+      bearbeite('Neuer Hinweis',[{label:'Text',wert:'',zeilen:4}],v=>{
+        if(v[0].trim())D.merken.push({id:neueId(),art:'tipp',text:esc(v[0].trim())})});
+      break;
+
+    case 'druck': window.print(); break;
+
+    case 'ausBlatt':{
+      const i=D.tage.findIndex(t=>t.id===a[0]);
+      if(i<0)break;
+      aktiverTag=i; aktiverTab='plan';
+      document.querySelectorAll('#fuss button').forEach(x=>x.classList.toggle('an',x.dataset.tab==='plan'));
+      document.querySelectorAll('.tab-inhalt').forEach(s=>s.classList.toggle('an',s.id==='tab-plan'));
+      document.getElementById('bahnen').style.display='';
+      zeichne(); window.scrollTo({top:0});
+      break;}
+
+    case 'einkaufKopieren':{
+      const zeilen=[];
+      D.einkauf.forEach(g=>{
+        const offen=g.posten.filter(p=>!p.ok);
+        if(offen.length){zeilen.push(g.titel+' ('+g.wann+')');
+          offen.forEach(p=>zeilen.push('· '+p.t));zeilen.push('')}
+      });
+      const txt=zeilen.join('\n').trim()||'Alles abgehakt.';
+      (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject())
+        .then(()=>melde('In die Zwischenablage kopiert'))
+        .catch(()=>bearbeite('Offene Posten',[{label:'Zum Kopieren markieren',wert:txt,zeilen:12}],()=>{}));
+      break;}
+
+    case 'export':{
+      const b=new Blob([JSON.stringify(D,null,1)],{type:'application/json'});
+      const u=URL.createObjectURL(b),l=document.createElement('a');
+      l.href=u;l.download='retreat-stand-'+new Date().toISOString().slice(0,10)+'.json';
+      l.click();setTimeout(()=>URL.revokeObjectURL(u),1500);
+      melde('Datei exportiert – jetzt teilen');
+      break;}
+
+    case 'import': document.getElementById('datei').click(); break;
+
+    case 'reset':
+      if(confirm('Wirklich alles auf den Ausgangsplan zurücksetzen? Eure Änderungen gehen verloren.')){
+        D=tiefKopie(START);sichern();zeichne();melde('Zurückgesetzt');
+      }
+      break;
+  }
+});
+
+/* Datei-Import */
+document.addEventListener('change',e=>{
+  if(e.target.id!=='datei')return;
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=()=>{
+    try{
+      const g=JSON.parse(r.result);
+      if(!g.tage||!Array.isArray(g.tage))throw 0;
+      D=(g.version===START.version)?g:verschmelzen(g);
+      sichern();zeichne();melde('Stand geladen');
+    }catch(err){melde('Datei konnte nicht gelesen werden')}
+    e.target.value='';
+  };
+  r.readAsText(f);
+});
+
+/* Tastatur */
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape')editorZu();
+});
+document.addEventListener('keypress',e=>{
+  if(e.key!=='Enter')return;
+  const z=e.target.closest('[data-klick]');
+  if(z&&z.classList.contains('feld-wert')){e.preventDefault();z.click()}
+});
+
+/* Tabs */
+document.getElementById('fuss').addEventListener('click',e=>{
+  const b=e.target.closest('button[data-tab]');if(!b)return;
+  aktiverTab=b.dataset.tab;
+  document.querySelectorAll('#fuss button').forEach(x=>x.classList.toggle('an',x===b));
+  document.querySelectorAll('.tab-inhalt').forEach(s=>
+    s.classList.toggle('an',s.id==='tab-'+aktiverTab));
+  document.getElementById('bahnen').style.display = aktiverTab==='plan'?'':'none';
+  zeichne();window.scrollTo({top:0});
+});
+
+/* ══ Start ══ */
+laden();
+const heute=new Date().toISOString().slice(0,10);
+const i=D.tage.findIndex(t=>t.iso>=heute);
+aktiverTag = i>=0 ? i : 0;
+zeichne();
+
+</script>
+</body>
+</html>
