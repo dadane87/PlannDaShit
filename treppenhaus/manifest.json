@@ -1,0 +1,16 @@
+{
+  "name": "Das Treppenhaus",
+  "short_name": "Treppenhaus",
+  "description": "Begehbares Duplo-Haus mit Treppe, Turm, Garten und allen Tieren",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "portrait",
+  "background_color": "#f2eee6",
+  "theme_color": "#2f9e3a",
+  "lang": "de",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

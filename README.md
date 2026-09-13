@@ -1,5 +1,16 @@
 # Familien-Retreat 17.8. – 6.9.2026
 
+> **Neu: [Das Treppenhaus](treppenhaus/)** – ein Spiel für die Kinder. Das große Duplo-Haus
+> (Treppe, Turm, Garten, Torbogen) ist in 3D nachgebaut. Man läuft mit Ben, Mia oder Leo
+> hindurch, klettert die Treppen hoch und sucht acht versteckte Sachen, während Peppa, Papa Wutz,
+> Suzy, Pferd, Pony, Kuh, die drei Hunde und die Bienen herumlaufen.
+>
+> Adresse nach dem Pages-Deploy: `https://DEIN-NAME.github.io/PlannDaShit/treppenhaus/`
+> Auf dem iPhone in Safari öffnen → Teilen → *Zum Home-Bildschirm*, dann startet es im Vollbild.
+> Steuerung: linker Daumen = laufen, rechts wischen = Kamera drehen, gelber Knopf = hüpfen,
+> ⟳ = Haus von der nächsten Seite ansehen. Am Computer: Pfeiltasten/WASD, Leertaste, Maus ziehen.
+> Läuft komplett ohne Server oder Internet-Bibliotheken (three.js liegt im Ordner `treppenhaus/`).
+
 Handy-App für die drei Kita-freien Wochen: Tagesplan mit allen festen Terminen,
 Kalenderblatt zum Ausdrucken, Einkaufsplan, Spielideen und Checklisten.
 Alles direkt in der App änderbar.
