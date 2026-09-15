@@ -379,6 +379,7 @@ function parent(img, kind) {
 }
 
 window.FIG = {
+  parent,
   build(IMG) {
     const out = {};
     out.whale = whale(); out.turtle = turtle(); out.hug = turtle({ hug: true }); out.star = star(); out.jelly = jelly();

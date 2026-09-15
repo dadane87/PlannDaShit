@@ -1,7 +1,7 @@
 // Fidibus und der Weg nach Hause – Version 2 in 3D (three.js).
 // Spiellogik, Geschichte und Steuerung wie in Version 1 (Welt in 2D-Einheiten), Darstellung in 3D.
 import * as THREE from './three.module.min.js';
-import { makeFish, animFish, makeWhale, animWhale, makeStar, makeJelly, animJelly, makeTurtle, animTurtle, setLids, M } from './figures3d.js';
+import { makeBookFish, animBookFish, BOOK_EYES, BOOK_SPR, makeWhale, animWhale, makeStar, makeJelly, animJelly, makeTurtle, animTurtle, setLids, M } from './figures3d.js';
 
 const WORLD_W = 11200, WORLD_H = 1400;
 const HOME = { x: 330, y: 1080 };
@@ -467,7 +467,12 @@ const pool = { b: [], h: [] };
 function spriteFrom(kind) { const arr = pool[kind]; const s = arr.find(x => !x.visible); if (s) return s; const n = new THREE.Sprite(kind === 'b' ? bubbleMat.clone() : heartMat.clone()); scene.add(n); arr.push(n); return n; }
 
 // ───────────── Figuren ─────────────
-const fidM = makeFish('fid'), mamaM = makeFish('mama'), papaM = makeFish('papa');
+// Buchbilder laden (aus Version 1) und Mama/Papa daraus ableiten
+const IMG = {};
+await Promise.all(['fid_happy', 'fid_talk', 'fid_sad', 'fid_worried', 'fid_sleep', 'fid_front'].map(k => new Promise(res => { const im = new Image(); im.onload = res; im.onerror = res; im.src = '../fidibus/img/' + k + '.png'; IMG[k] = im; })));
+const fidPoses = {}; for (const k in IMG) if (IMG[k].width) fidPoses[k] = { src: IMG[k], face: BOOK_SPR[k].face, w: BOOK_SPR[k].w, eyes: BOOK_EYES[k] };
+const parentPose = kind => { const p = window.FIG.parent(IMG.fid_happy, kind); return { [kind]: { src: p.c, face: p.face, w: BOOK_SPR[kind].w, eyes: p.eyes } }; };
+const fidM = makeBookFish('fid', fidPoses), mamaM = makeBookFish('mama', parentPose('mama')), papaM = makeBookFish('papa', parentPose('papa'));
 const whaleM = makeWhale(), starM = makeStar(), jellyM = makeJelly(), turtleM = makeTurtle();
 scene.add(fidM, mamaM, papaM, whaleM, starM, jellyM, turtleM);
 whaleM.position.set(X(2520) + 6.6, Y(720), 0.4);
@@ -482,10 +487,10 @@ function syncFish(m, f, kind, off) {
   m.visible = !f.hidden;
   m.position.set(X(f.x), Y(f.y) + Math.sin(f.fin * 0.9) * 0.03, kind === 'mama' ? -0.6 : kind === 'papa' ? 0.3 : 0);
   const front = f.mood === 'front';
-  const yaw = front ? Math.PI / 2 : (f.dir > 0 ? Math.PI : 0);
+  const yaw = front ? 0 : (f.dir > 0 ? Math.PI : 0);
   m.rotation.set(0, yaw, (f.dir > 0 ? 1 : -1) * -f.tilt * 0.8 * (front ? 0 : 1));
   const line = G.mode === 'dialog' ? G.dialogQueue[G.dialogIdx] : null; const typing = !!(line && G.typed < line.text.length);
-  animFish(m, G.t + off, { moving: Math.hypot(f.vx, f.vy) > 30, speed: Math.hypot(f.vx, f.vy) / 100, mood: f.mood, talking: f.talking && typing, blink: blink(kind === 'fid' ? 4.1 : 5.3, off) });
+  animBookFish(m, G.t + off, { moving: Math.hypot(f.vx, f.vy) > 30, speed: Math.hypot(f.vx, f.vy) / 100, mood: f.mood, talking: f.talking && typing, blink: blink(kind === 'fid' ? 4.1 : 5.3, off) });
 }
 function render3d(dt) {
   const t = G.t;
@@ -493,7 +498,7 @@ function render3d(dt) {
   syncFish(fidM, G.fid, 'fid', 0.4); syncFish(mamaM, G.mama, 'mama', 1.9); syncFish(papaM, G.papa, 'papa', 3.1);
   // Umarmung: Fidibus schmiegt sich an den Kopf der Schildkröte
   const hug = G.turtle.hug;
-  if (hug > 0.5) { fidM.visible = true; fidM.position.set(turtleM.position.x - 5.2, turtleM.position.y + 0.1, 0.9); fidM.rotation.set(0, Math.PI * 0.75, 0.45); setLids(fidM, true); }
+  if (hug > 0.5) { fidM.visible = true; fidM.position.set(turtleM.position.x - 5.0, turtleM.position.y + 0.35, 1.4); fidM.rotation.set(0, 0.35, 0.4); setLids(fidM, true); }
   const line = G.mode === 'dialog' ? G.dialogQueue[G.dialogIdx] : null; const typing = !!(line && G.typed < line.text.length);
   const speaks = who => typing && line.who === who;
   animTurtle(turtleM, t, { hug, blink: blink(5.6, 3.3), talking: speaks('Oma-Schildkröte') || speaks('Schildkröte') });
@@ -546,4 +551,4 @@ const _startStory = startStory;
 document.getElementById('loading').style.display = 'none';
 requestAnimationFrame(frame);
 
-window.FB = { G, POS, HOME, STORY, scene, camera, renderer, nextStep, startStory, jumpToStep(i) { G.step = i - 1; nextStep(); }, tp(x, y) { const f = G[G.ctrl || 'fid']; f.x = x; f.y = y; G.cam.x = x; G.cam.y = y; }, advanceDialog, tick(sec) { const n = Math.round(sec * 60); for (let i = 0; i < n; i++) update(1 / 60); }, setTarget(x, y) { G.target = { x, y }; }, draw: () => render3d(0), rebuildCollect, setZoom(v) { zoom = v; G.zoomOverride = v; } };
+window.FB = { THREE, G, POS, HOME, STORY, scene, camera, renderer, nextStep, startStory, jumpToStep(i) { G.step = i - 1; nextStep(); }, tp(x, y) { const f = G[G.ctrl || 'fid']; f.x = x; f.y = y; G.cam.x = x; G.cam.y = y; }, advanceDialog, tick(sec) { const n = Math.round(sec * 60); for (let i = 0; i < n; i++) update(1 / 60); }, setTarget(x, y) { G.target = { x, y }; }, draw: () => render3d(0), rebuildCollect, setZoom(v) { zoom = v; G.zoomOverride = v; } };

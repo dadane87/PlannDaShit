@@ -120,7 +120,7 @@ function eye(p, r, x, y, z, opts = {}) {
   return g;
 }
 const LID_CLOSED = Math.PI / 2 * 0.92;
-export function setLids(root, closed) { root.traverse(o => { if (o.userData && o.userData.lid) o.userData.lid.rotation.x = closed ? LID_CLOSED : o.userData.lidRest; }); }
+export function setLids(root, closed) { if (root.userData.bookLids) root.userData.bookLids(closed); root.traverse(o => { if (o.userData && o.userData.lid) o.userData.lid.rotation.x = closed ? LID_CLOSED : o.userData.lidRest; }); }
 export function blinkLids(root, k) { root.traverse(o => { if (o.userData && o.userData.lid) o.userData.lid.rotation.x = o.userData.lidRest * (1 - k) + LID_CLOSED * k; }); }
 function blushPair(g, x, y, z, r) { for (const sz of [-1, 1]) sph(g, r, 0xff8a7a, x, y, sz * z, 1, 0.7, 0.4, { alpha: 0.35 }); }
 function smileMesh(p, r, t, col, x, y, z, rot) { const m = new THREE.Mesh(new THREE.TorusGeometry(r, t, 8, 28, Math.PI), M(col, { rough: 0.6 })); m.position.set(x, y, z); m.rotation.set(...rot); p.add(m); return m; }
@@ -291,4 +291,144 @@ export function animTurtle(g, t, o) {
   const m = p.mouth.userData.m; const hs = o.talking ? 0.8 + 0.7 * Math.sin(t * 8) : 0.6;
   m.cav.scale.set(m.dep, m.hgt * hs, m.w); m.edge.scale.set(m.w * 1.05, m.hgt * hs * 1.1, 1); m.tongue.position.y = -m.hgt * hs * 0.45; m.lip.position.y = -m.hgt * hs * 0.95;
   if (hug > 0.5) setLids(g, true); else blinkLids(g, o.blink || 0);
+}
+
+// ───────────── Buch-Fische: Fidibus, Mama und Papa aus den Original-Illustrationen ─────────────
+// Die Buchbilder werden zu 3D-Körpern „aufgeblasen“: Die Silhouette bestimmt die Form, die Dicke folgt dem
+// Abstand zum Rand (Kugelprofil), die Illustration liegt als Textur auf beiden Seiten. Schwanz mit Gelenk,
+// Lider zum Blinzeln/Schlafen werden wie in Version 1 ins Bild gemalt.
+export const BOOK_EYES = {
+  fid_happy: [{ cx: 90, cy: 119, rx: 32, ry: 31, col: '#f08701' }], fid_talk: [{ cx: 186, cy: 68, rx: 16, ry: 17, col: '#de6f01' }],
+  fid_sad: [{ cx: 232, cy: 88, rx: 20, ry: 17, col: '#ed6904' }], fid_worried: [{ cx: 256, cy: 125, rx: 23, ry: 30, col: '#e77902' }, { cx: 324, cy: 133, rx: 20, ry: 24, col: '#c46104' }],
+  fid_front: [{ cx: 87, cy: 81, rx: 15, ry: 14, col: '#e57100' }, { cx: 44, cy: 82, rx: 14, ry: 15, col: '#e87300' }]
+};
+export const BOOK_SPR = { fid_happy: { face: -1, w: 150 }, fid_talk: { face: 1, w: 128 }, fid_sad: { face: 1, w: 142 }, fid_worried: { face: 1, w: 152 }, fid_sleep: { face: 1, w: 150 }, fid_front: { face: 1, w: 92 }, mama: { face: -1, w: 215 }, papa: { face: -1, w: 228 } };
+const BOOK_K = 0.0135;   // Sprite-Breite aus Version 1 (px) → Welteinheiten
+
+// Farben in transparente Pixel bluten lassen (gegen dunkle Säume beim Filtern)
+function bleed(img, passes, harden = 0) {
+  const w = img.width, h = img.height, d = img.data; let filled = new Uint8Array(w * h);
+  // nur satt opake Pixel behalten ihre Farbe; halbtransparente Randpixel tragen oft noch die Hintergrundfarbe des Buches
+  for (let i = 0; i < w * h; i++) { filled[i] = d[i * 4 + 3] > 190 ? 1 : 0; d[i * 4 + 3] = filled[i] ? 255 : 0; }
+  const orig = filled.slice();
+  for (let p = 0; p < passes; p++) {
+    const next = filled.slice();
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x; if (filled[i]) continue; let r = 0, g = 0, b = 0, n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if ((!dx && !dy) || xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = yy * w + xx; if (filled[j]) { r += d[j * 4]; g += d[j * 4 + 1]; b += d[j * 4 + 2]; n++; } }
+      if (n) { d[i * 4] = r / n; d[i * 4 + 1] = g / n; d[i * 4 + 2] = b / n; d[i * 4 + 3] = p < harden ? 255 : 0; next[i] = 1; }
+    }
+    filled = next;
+  }
+  // geblutete Zone weichzeichnen (gegen Streifen an der Kante)
+  for (let p = 0; p < 3; p++) {
+    const src = new Uint8ClampedArray(d);
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = y * w + x; if (orig[i] || !filled[i]) continue; let r = 0, g = 0, b = 0, n = 0;
+      for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const xx = x + dx, yy = y + dy; if (xx < 0 || yy < 0 || xx >= w || yy >= h) continue; const j = yy * w + xx; if (filled[j]) { r += src[j * 4]; g += src[j * 4 + 1]; b += src[j * 4 + 2]; n++; } }
+      if (n) { d[i * 4] = r / n; d[i * 4 + 1] = g / n; d[i * 4 + 2] = b / n; }
+    }
+  }
+}
+function inflate(src, worldW, opts = {}) {
+  const iw = src.width, ih = src.height, step = Math.max(1, Math.round(Math.max(iw, ih) / 84));
+  const cols = Math.ceil(iw / step) + 3, rows = Math.ceil(ih / step) + 3;
+  // Quellbild mit geblutetem Rand
+  const base = document.createElement('canvas'); base.width = iw; base.height = ih; const bg = base.getContext('2d'); bg.drawImage(src, 0, 0);
+  // Alpha um gut eine Rasterweite nach außen härten: Die Netzkante liegt dann in opaker Textur (kein transparentes Band an der Kante)
+  const idata = bg.getImageData(0, 0, iw, ih); const A0 = new Uint8ClampedArray(idata.data); bleed(idata, step + 6, step + 2); bg.putImageData(idata, 0, 0);
+  const A = idata.data;
+  const alphaAt = (x, y) => { x = Math.round(x); y = Math.round(y); return (x < 0 || y < 0 || x >= iw || y >= ih) ? 0 : A[(y * iw + x) * 4 + 3]; };
+  const pad = step * 2 + 4, cw = iw + 2 * pad, ch = ih + 2 * pad;
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d'); g.drawImage(base, pad, pad);
+  const PX = q => (q - 1) * step, PY = r => (r - 1) * step;
+  // innen = Original-Pixel in unmittelbarer Nähe des Knotens ist opak (Textur ist um step+2 px gehärtet, Randknoten liegen also in opaker Textur)
+  const ins = new Uint8Array(cols * rows);
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { let on = 0; for (let dy = -1; dy <= 1 && !on; dy++) for (let dx = -1; dx <= 1; dx++) if (A0[(Math.min(ih - 1, Math.max(0, PY(r) + dy)) * iw + Math.min(iw - 1, Math.max(0, PX(q) + dx))) * 4 + 3] > 128) { on = 1; break; } ins[r * cols + q] = on; }
+  const used = new Uint8Array(cols * rows), nx = new Float32Array(cols * rows), ny = new Float32Array(cols * rows);
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { const i = r * cols + q; nx[i] = PX(q); ny[i] = PY(r); let u = ins[i]; for (let dr = -1; dr <= 1 && !u; dr++) for (let dq = -1; dq <= 1; dq++) { const rr = r + dr, qq = q + dq; if (rr >= 0 && qq >= 0 && rr < rows && qq < cols && ins[rr * cols + qq]) { u = 1; break; } } used[i] = u; }
+  // Abstand zum Rand (Chamfer, zwei Durchläufe)
+  const D = new Float32Array(cols * rows); const INF = 1e6;
+  for (let i = 0; i < D.length; i++) D[i] = ins[i] ? INF : 0;
+  const at = (r, q) => (r < 0 || q < 0 || r >= rows || q >= cols) ? 0 : D[r * cols + q];
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { const i = r * cols + q; if (!ins[i]) continue; D[i] = Math.min(D[i], at(r - 1, q) + 1, at(r, q - 1) + 1, at(r - 1, q - 1) + 1.414, at(r - 1, q + 1) + 1.414); }
+  for (let r = rows - 1; r >= 0; r--) for (let q = cols - 1; q >= 0; q--) { const i = r * cols + q; if (!ins[i]) continue; D[i] = Math.min(D[i], at(r + 1, q) + 1, at(r, q + 1) + 1, at(r + 1, q + 1) + 1.414, at(r + 1, q - 1) + 1.414); }
+  let dmax = 0; for (let i = 0; i < D.length; i++) if (D[i] < INF) dmax = Math.max(dmax, D[i]);
+  const cap = dmax * (opts.cap ?? 0.92), k = worldW / iw, Tz = cap * step * k * (opts.fat ?? 0.85);
+  // Kugelprofil, aber der erste Knoten innen springt nur halb so hoch: dünne Flossen bleiben flach, die Kante wird weicher
+  const zOf = d => { const n = Math.max(0, Math.min(d, cap) - 0.6) / cap; return Tz * Math.sqrt(Math.max(0, 1 - (1 - n) * (1 - n))); };
+  // Schwanzansatz: schmalste Stelle zwischen dem breitesten Körperteil und der Schwanzflosse
+  let split = -1;
+  if (opts.face) {
+    const ext = []; let qMax = 0; for (let q = 0; q < cols; q++) { let n = 0; for (let r = 0; r < rows; r++) n += ins[r * cols + q]; ext.push(n); if (n > ext[qMax]) qMax = q; }
+    const dir = opts.face < 0 ? 1 : -1; let last = -1;
+    for (let q = qMax; q >= 0 && q < cols; q += dir) if (ext[q] >= ext[qMax] * 0.28) last = q;
+    let best = 1e9; for (let q = qMax + dir * 3; q !== last && q >= 0 && q < cols; q += dir) if (ext[q] < best) { best = ext[q]; split = q; }
+    if (split > 0 && best > ext[qMax] * 0.6) split = -1;
+  }
+  const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
+  const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, roughness: 0.9, metalness: 0, side: THREE.FrontSide, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.32 });
+  const wx = i => (nx[i] - iw / 2) * k, wy = i => (ih / 2 - ny[i]) * k;
+  function build(qFrom, qTo, x0) {
+    const pos = [], uv = [], idx = []; const id = new Int32Array(cols * rows).fill(-1); let n = 0;
+    for (const side of [1, -1]) {
+      for (let r = 0; r < rows; r++) for (let q = qFrom; q <= qTo; q++) { const i = r * cols + q; if (!used[i]) continue; if (side > 0) id[i] = n; pos.push(wx(i) - x0, wy(i), side * zOf(D[i] < INF ? D[i] : 0)); uv.push((nx[i] + pad) / cw, 1 - (ny[i] + pad) / ch); n++; }
+      const off = side > 0 ? 0 : n / 2 | 0;
+      for (let r = 0; r < rows - 1; r++) for (let q = qFrom; q < qTo; q++) {
+        const a = id[r * cols + q], b = id[r * cols + q + 1], cc = id[(r + 1) * cols + q], d = id[(r + 1) * cols + q + 1]; if (a < 0 || b < 0 || cc < 0 || d < 0) continue;
+        const o = side > 0 ? 0 : off; if (side > 0) idx.push(a, cc, b, b, cc, d); else idx.push(a + o, b + o, cc + o, b + o, d + o, cc + o);
+      }
+    }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx); geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, mat); m.castShadow = true; m.receiveShadow = false; return m;
+  }
+  const group = new THREE.Group(); let tail = null;
+  if (split > 0) {
+    const xs = (PX(split) - iw / 2) * k;
+    const bodyRange = opts.face < 0 ? [0, split] : [split, cols - 1], tailRange = opts.face < 0 ? [split, cols - 1] : [0, split];
+    group.add(build(bodyRange[0], bodyRange[1], 0));
+    tail = new THREE.Group(); tail.position.x = xs; tail.add(build(tailRange[0], tailRange[1], xs)); group.add(tail);
+  } else group.add(build(0, cols - 1, 0));
+  // Lider ins Bild malen (wie Version 1)
+  let lidState = -1;
+  const redraw = on => {
+    if (on === lidState) return; lidState = on;
+    g.clearRect(0, 0, cw, ch); g.drawImage(base, pad, pad);
+    if (on && opts.eyes) for (const e of opts.eyes) {
+      const ex = e.cx + pad, ey = e.cy + pad;
+      g.fillStyle = e.col; g.beginPath(); g.ellipse(ex, ey, e.rx, e.ry, 0, 0, 7); g.fill();
+      g.strokeStyle = 'rgba(50,25,10,.5)'; g.lineWidth = Math.max(1.2, e.rx * 0.12); g.lineCap = 'round';
+      g.beginPath(); g.ellipse(ex, ey + e.ry * 0.1, e.rx * 0.8, e.ry * 0.45, 0, 0.2, Math.PI - 0.2); g.stroke();
+    }
+    tex.needsUpdate = true;
+  };
+  redraw(0);
+  return { group, tail, redraw };
+}
+
+// poses: { key: { src, face, w, eyes } } – alle Posen blicken nach der Drehung nach -X
+export function makeBookFish(kind, poses) {
+  const g = new THREE.Group(); const P = {};
+  for (const key in poses) {
+    const p = poses[key]; const inf = inflate(p.src, p.w * BOOK_K, { face: key === 'fid_front' ? 0 : p.face, eyes: p.eyes, fat: key === 'fid_front' ? 0.6 : 0.85 });
+    inf.group.rotation.y = p.face < 0 ? 0 : Math.PI; inf.group.visible = false; g.add(inf.group); P[key] = inf;
+  }
+  g.userData.book = { poses: P, kind, current: null };
+  g.userData.bookLids = closed => { const cur = g.userData.book.current; if (cur) P[cur].redraw(closed ? 1 : 0); };
+  return g;
+}
+export function animBookFish(g, t, o) {
+  const B = g.userData.book; let key = B.kind;
+  if (B.kind === 'fid') {
+    key = o.mood === 'sleep' ? 'fid_sleep' : o.mood === 'sad' ? 'fid_sad' : o.mood === 'worried' ? 'fid_worried' : o.mood === 'front' ? 'fid_front' : 'fid_happy';
+    if (o.talking && (o.mood === 'happy' || o.mood === 'front') && Math.floor(t * 7) % 2 === 0 && B.poses.fid_talk) key = 'fid_talk';
+  }
+  if (!B.poses[key]) key = Object.keys(B.poses)[0];
+  for (const k in B.poses) B.poses[k].group.visible = k === key;
+  B.current = key; const pose = B.poses[key];
+  pose.redraw(o.mood === 'sleep' || (o.blink || 0) > 0 ? 1 : 0);
+  const sp = o.speed || 0, wag = Math.sin(t * (6 + sp * 1.5)) * (o.moving ? 0.45 : 0.16);
+  if (pose.tail) pose.tail.rotation.y = wag * (pose.group.rotation.y ? -1 : 1);
+  pose.group.rotation.z = (o.talking ? Math.sin(t * 13) * 0.025 : 0);
+  pose.group.scale.set(1 + Math.sin(t * 1.8) * 0.015, 1 - Math.sin(t * 1.8) * 0.015, 1);
 }
