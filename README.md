@@ -3,7 +3,8 @@
 > **Neu: [Fidibus und der Weg nach Hause](fidibus/)** – das Bilderbuch als Spiel. Man schwimmt
 > als Fidibus den ganzen Weg der Geschichte: vom Riff zum Wal, zum Seestern, durch das dunkle
 > Wasser, zur Qualle, durch das Seegras zur Oma-Schildkröte. Dann suchen Mama und Papa, und zum
-> Schluss geht es zu dritt nach Hause ins Moosbett. Alle Texte stammen aus dem Buch.
+> Schluss geht es zu dritt nach Hause ins Moosbett. Texte und Figuren stammen direkt aus dem Buch
+> (die Illustrationen sind freigestellt und werden als Spielfiguren verwendet).
 > Adresse: `https://dadane87.github.io/PlannDaShit/fidibus/` · Finger halten = schwimmen, tippen = weiterlesen.
 
 > **Neu: [Das Treppenhaus](treppenhaus/)** – ein Spiel für die Kinder. Das große Duplo-Haus
