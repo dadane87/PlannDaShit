@@ -306,10 +306,10 @@ export const BOOK_SPR = { fid_happy: { face: -1, w: 150 }, fid_talk: { face: 1, 
 const BOOK_K = 0.0135;   // Sprite-Breite aus Version 1 (px) → Welteinheiten
 
 // Farben in transparente Pixel bluten lassen (gegen dunkle Säume beim Filtern)
-function bleed(img, passes, harden = 0) {
+function bleed(img, passes, harden = 0, alphaMin = 190) {
   const w = img.width, h = img.height, d = img.data; let filled = new Uint8Array(w * h);
   // nur satt opake Pixel behalten ihre Farbe; halbtransparente Randpixel tragen oft noch die Hintergrundfarbe des Buches
-  for (let i = 0; i < w * h; i++) { filled[i] = d[i * 4 + 3] > 190 ? 1 : 0; d[i * 4 + 3] = filled[i] ? 255 : 0; }
+  for (let i = 0; i < w * h; i++) { filled[i] = d[i * 4 + 3] > alphaMin ? 1 : 0; d[i * 4 + 3] = filled[i] ? 255 : 0; }
   const orig = filled.slice();
   for (let p = 0; p < passes; p++) {
     const next = filled.slice();
@@ -331,22 +331,30 @@ function bleed(img, passes, harden = 0) {
   }
 }
 function inflate(src, worldW, opts = {}) {
-  const iw = src.width, ih = src.height, step = Math.max(1, Math.round(Math.max(iw, ih) / 84));
+  const iw = src.width, ih = src.height, step = Math.max(1, Math.round(Math.max(iw, ih) / (opts.res || 130)));
   const cols = Math.ceil(iw / step) + 3, rows = Math.ceil(ih / step) + 3;
-  // Quellbild mit geblutetem Rand
-  const base = document.createElement('canvas'); base.width = iw; base.height = ih; const bg = base.getContext('2d'); bg.drawImage(src, 0, 0);
-  // Alpha um gut eine Rasterweite nach außen härten: Die Netzkante liegt dann in opaker Textur (kein transparentes Band an der Kante)
-  const idata = bg.getImageData(0, 0, iw, ih); const A0 = new Uint8ClampedArray(idata.data); bleed(idata, step + 6, step + 2); bg.putImageData(idata, 0, 0);
-  const A = idata.data;
-  const alphaAt = (x, y) => { x = Math.round(x); y = Math.round(y); return (x < 0 || y < 0 || x >= iw || y >= ih) ? 0 : A[(y * iw + x) * 4 + 3]; };
+  // Quellbild mit transparentem Rand (pad), darin geblutete Farben und nach außen gehärtetes Alpha:
+  // Die Netzkante liegt dann in opaker Textur (kein transparentes Band an der Kante, auch wenn das Bild den Rand berührt)
   const pad = step * 2 + 4, cw = iw + 2 * pad, ch = ih + 2 * pad;
-  const c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d'); g.drawImage(base, pad, pad);
+  const base = document.createElement('canvas'); base.width = cw; base.height = ch; const bg = base.getContext('2d'); bg.drawImage(src, pad, pad);
+  const idata = bg.getImageData(0, 0, cw, ch); const A0 = new Uint8ClampedArray(idata.data); bleed(idata, step + 6, step + 2, opts.alphaMin ?? 190); bg.putImageData(idata, 0, 0);
+  const c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d'); g.drawImage(base, 0, 0);
   const PX = q => (q - 1) * step, PY = r => (r - 1) * step;
   // innen = Original-Pixel in unmittelbarer Nähe des Knotens ist opak (Textur ist um step+2 px gehärtet, Randknoten liegen also in opaker Textur)
+  const a0 = (x, y) => { x = Math.round(x) + pad; y = Math.round(y) + pad; return (x < 0 || y < 0 || x >= cw || y >= ch) ? 0 : A0[(y * cw + x) * 4 + 3]; };
+  const TH = opts.alphaMin ?? 190;
   const ins = new Uint8Array(cols * rows);
-  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { let on = 0; for (let dy = -1; dy <= 1 && !on; dy++) for (let dx = -1; dx <= 1; dx++) if (A0[(Math.min(ih - 1, Math.max(0, PY(r) + dy)) * iw + Math.min(iw - 1, Math.max(0, PX(q) + dx))) * 4 + 3] > 128) { on = 1; break; } ins[r * cols + q] = on; }
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { let on = 0; for (let dy = -1; dy <= 1 && !on; dy++) for (let dx = -1; dx <= 1; dx++) if (a0(PX(q) + dx, PY(r) + dy) > TH) { on = 1; break; } ins[r * cols + q] = on; }
   const used = new Uint8Array(cols * rows), nx = new Float32Array(cols * rows), ny = new Float32Array(cols * rows);
   for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { const i = r * cols + q; nx[i] = PX(q); ny[i] = PY(r); let u = ins[i]; for (let dr = -1; dr <= 1 && !u; dr++) for (let dq = -1; dq <= 1; dq++) { const rr = r + dr, qq = q + dq; if (rr >= 0 && qq >= 0 && rr < rows && qq < cols && ins[rr * cols + qq]) { u = 1; break; } } used[i] = u; }
+  // Randknoten auf die Bildkontur schieben (1 px außerhalb der Kante, also noch in der gehärteten Textur): glatte Silhouette statt Treppenstufen
+  const DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
+  for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) {
+    const i = r * cols + q; if (!used[i] || ins[i]) continue; let best = 2, bd = null;
+    for (const d of DIRS) { const rr = r + d[1], qq = q + d[0]; if (rr < 0 || qq < 0 || rr >= rows || qq >= cols || !ins[rr * cols + qq]) continue;
+      for (let k = 1; k <= step; k++) { const t = k / step; if (a0(PX(q) + d[0] * step * t, PY(r) + d[1] * step * t) > TH) { if (t < best) { best = t; bd = d; } break; } } }
+    if (bd) { const len = Math.max(0, step * best - 1.5); nx[i] = PX(q) + bd[0] * len; ny[i] = PY(r) + bd[1] * len; }
+  }
   // Abstand zum Rand (Chamfer, zwei Durchläufe)
   const D = new Float32Array(cols * rows); const INF = 1e6;
   for (let i = 0; i < D.length; i++) D[i] = ins[i] ? INF : 0;
@@ -359,9 +367,9 @@ function inflate(src, worldW, opts = {}) {
   const zOf = d => { const n = Math.max(0, Math.min(d, cap) - 0.6) / cap; return Tz * Math.sqrt(Math.max(0, 1 - (1 - n) * (1 - n))); };
   // Schwanzansatz: schmalste Stelle zwischen dem breitesten Körperteil und der Schwanzflosse
   let split = -1;
-  if (opts.face) {
+  if (opts.tail) {
     const ext = []; let qMax = 0; for (let q = 0; q < cols; q++) { let n = 0; for (let r = 0; r < rows; r++) n += ins[r * cols + q]; ext.push(n); if (n > ext[qMax]) qMax = q; }
-    const dir = opts.face < 0 ? 1 : -1; let last = -1;
+    const dir = opts.tail === 'right' ? 1 : -1; let last = -1;
     for (let q = qMax; q >= 0 && q < cols; q += dir) if (ext[q] >= ext[qMax] * 0.28) last = q;
     let best = 1e9; for (let q = qMax + dir * 3; q !== last && q >= 0 && q < cols; q += dir) if (ext[q] < best) { best = ext[q]; split = q; }
     if (split > 0 && best > ext[qMax] * 0.6) split = -1;
@@ -385,7 +393,7 @@ function inflate(src, worldW, opts = {}) {
   const group = new THREE.Group(); let tail = null;
   if (split > 0) {
     const xs = (PX(split) - iw / 2) * k;
-    const bodyRange = opts.face < 0 ? [0, split] : [split, cols - 1], tailRange = opts.face < 0 ? [split, cols - 1] : [0, split];
+    const bodyRange = opts.tail === 'right' ? [0, split] : [split, cols - 1], tailRange = opts.tail === 'right' ? [split, cols - 1] : [0, split];
     group.add(build(bodyRange[0], bodyRange[1], 0));
     tail = new THREE.Group(); tail.position.x = xs; tail.add(build(tailRange[0], tailRange[1], xs)); group.add(tail);
   } else group.add(build(0, cols - 1, 0));
@@ -393,7 +401,7 @@ function inflate(src, worldW, opts = {}) {
   let lidState = -1;
   const redraw = on => {
     if (on === lidState) return; lidState = on;
-    g.clearRect(0, 0, cw, ch); g.drawImage(base, pad, pad);
+    g.clearRect(0, 0, cw, ch); g.drawImage(base, 0, 0);
     if (on && opts.eyes) for (const e of opts.eyes) {
       const ex = e.cx + pad, ey = e.cy + pad;
       g.fillStyle = e.col; g.beginPath(); g.ellipse(ex, ey, e.rx, e.ry, 0, 0, 7); g.fill();
@@ -406,16 +414,33 @@ function inflate(src, worldW, opts = {}) {
   return { group, tail, redraw };
 }
 
-// poses: { key: { src, face, w, eyes } } – alle Posen blicken nach der Drehung nach -X
-export function makeBookFish(kind, poses) {
+// Allgemeine Buchfigur. poses: { key: { src, w, eyes, tail: 'right'|'left'|null, flip: bool, fat, alphaMin } }
+// Seitenansichten blicken nach -X (flip dreht ein nach rechts blickendes Bild um), Frontansichten zur Kamera (+Z).
+export function makeBookFigure(kind, poses) {
   const g = new THREE.Group(); const P = {};
   for (const key in poses) {
-    const p = poses[key]; const inf = inflate(p.src, p.w * BOOK_K, { face: key === 'fid_front' ? 0 : p.face, eyes: p.eyes, fat: key === 'fid_front' ? 0.6 : 0.85 });
-    inf.group.rotation.y = p.face < 0 ? 0 : Math.PI; inf.group.visible = false; g.add(inf.group); P[key] = inf;
+    const p = poses[key]; const inf = inflate(p.src, p.w * BOOK_K, { tail: p.tail, eyes: p.eyes, fat: p.fat ?? 0.85, alphaMin: p.alphaMin, res: p.res });
+    inf.group.rotation.y = p.flip ? Math.PI : 0; inf.group.visible = false; g.add(inf.group); P[key] = inf;
   }
   g.userData.book = { poses: P, kind, current: null };
   g.userData.bookLids = closed => { const cur = g.userData.book.current; if (cur) P[cur].redraw(closed ? 1 : 0); };
   return g;
+}
+// o: { pose, lids (0/1), wag (Schwanz), tilt (Neigung), pulse (Atmen) }
+export function animBook(g, t, o) {
+  const B = g.userData.book; const key = o.pose && B.poses[o.pose] ? o.pose : Object.keys(B.poses)[0];
+  for (const k in B.poses) B.poses[k].group.visible = k === key;
+  B.current = key; const pose = B.poses[key]; pose.redraw(o.lids ? 1 : 0);
+  if (pose.tail) pose.tail.rotation.y = (o.wag || 0) * (pose.group.rotation.y ? -1 : 1);
+  pose.group.rotation.z = o.tilt || 0;
+  const p = o.pulse || 0; pose.group.scale.set(1 + p, 1 - p * 0.75, 1);
+  return pose;
+}
+// Fische: Posen aus Version-1-Sprites { src, face, w, eyes }
+export function makeBookFish(kind, poses) {
+  const spec = {};
+  for (const key in poses) { const p = poses[key]; const front = key === 'fid_front'; spec[key] = { src: p.src, w: p.w, eyes: p.eyes, tail: front ? null : (p.face < 0 ? 'right' : 'left'), flip: p.face > 0, fat: front ? 0.6 : 0.85 }; }
+  return makeBookFigure(kind, spec);
 }
 export function animBookFish(g, t, o) {
   const B = g.userData.book; let key = B.kind;
@@ -423,12 +448,6 @@ export function animBookFish(g, t, o) {
     key = o.mood === 'sleep' ? 'fid_sleep' : o.mood === 'sad' ? 'fid_sad' : o.mood === 'worried' ? 'fid_worried' : o.mood === 'front' ? 'fid_front' : 'fid_happy';
     if (o.talking && (o.mood === 'happy' || o.mood === 'front') && Math.floor(t * 7) % 2 === 0 && B.poses.fid_talk) key = 'fid_talk';
   }
-  if (!B.poses[key]) key = Object.keys(B.poses)[0];
-  for (const k in B.poses) B.poses[k].group.visible = k === key;
-  B.current = key; const pose = B.poses[key];
-  pose.redraw(o.mood === 'sleep' || (o.blink || 0) > 0 ? 1 : 0);
   const sp = o.speed || 0, wag = Math.sin(t * (6 + sp * 1.5)) * (o.moving ? 0.45 : 0.16);
-  if (pose.tail) pose.tail.rotation.y = wag * (pose.group.rotation.y ? -1 : 1);
-  pose.group.rotation.z = (o.talking ? Math.sin(t * 13) * 0.025 : 0);
-  pose.group.scale.set(1 + Math.sin(t * 1.8) * 0.015, 1 - Math.sin(t * 1.8) * 0.015, 1);
+  animBook(g, t, { pose: key, lids: o.mood === 'sleep' || (o.blink || 0) > 0 ? 1 : 0, wag, tilt: o.talking ? Math.sin(t * 13) * 0.025 : 0, pulse: Math.sin(t * 1.8) * 0.015 });
 }

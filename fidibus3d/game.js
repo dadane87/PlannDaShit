@@ -1,7 +1,7 @@
 // Fidibus und der Weg nach Hause – Version 2 in 3D (three.js).
 // Spiellogik, Geschichte und Steuerung wie in Version 1 (Welt in 2D-Einheiten), Darstellung in 3D.
 import * as THREE from './three.module.min.js';
-import { makeBookFish, animBookFish, BOOK_EYES, BOOK_SPR, makeWhale, animWhale, makeStar, makeJelly, animJelly, makeTurtle, animTurtle, setLids, M } from './figures3d.js';
+import { makeBookFish, animBookFish, makeBookFigure, animBook, BOOK_EYES, BOOK_SPR, setLids, M } from './figures3d.js';
 
 const WORLD_W = 11200, WORLD_H = 1400;
 const HOME = { x: 330, y: 1080 };
@@ -352,8 +352,8 @@ function update(dt) {
       if (G.t > 0.8 && G.t < 0.9) SFX.hug();
     } else if (G.cut === 'reunion') {
       G.turtle.hug = lerp(G.turtle.hug, 0, 1 - Math.exp(-3 * dt)); if (G.turtle.hug < 0.5) G.fid.hidden = false;
-      const mx = POS.turtle.x - 520, my = POS.turtle.y - 120;
-      follow(G.mama, mx - 60, my - 20, dt, 3, 400); follow(G.papa, mx - 260, my + 90, dt, 3, 400);
+      const mx = POS.turtle.x - 700, my = POS.turtle.y - 120;
+      follow(G.mama, mx - 60, my - 20, dt, 3, 400); follow(G.papa, mx - 190, my + 90, dt, 3, 400);
       if (p > 0.25) { follow(G.fid, mx + 130, my + 60, dt, 4, 700); G.fid.dir = -1; if (p > 0.6) G.fid.mood = 'front'; }
       if (p > 0.45 && Math.random() < dt * 4) G.hearts.push({ x: mx + (Math.random() - 0.5) * 200, y: my - 40, life: 1.8, vx: (Math.random() - 0.5) * 30 });
       if (G.t > 1.1 && G.t < 1.2) SFX.hug();
@@ -382,7 +382,7 @@ function update(dt) {
   // Kamera
   let focus = ctrl;
   if (G.mode === 'cut' && G.cut === 'hug') focus = { x: POS.turtle.x - 150, y: POS.turtle.y + 40 };
-  if (G.mode === 'cut' && G.cut === 'reunion') focus = { x: POS.turtle.x - 400, y: POS.turtle.y + 20 };
+  if (G.mode === 'cut' && G.cut === 'reunion') focus = { x: POS.turtle.x - 560, y: POS.turtle.y + 20 };
   if (G.mode === 'cut' && G.cut === 'night' || G.mode === 'end') focus = { x: HOME.x + 40, y: HOME.y + 60 };
   if (G.mode === 'title') focus = { x: HOME.x + 200, y: 900 };
   if (G.mode === 'dialog' && G.stationsDone.size >= 0 && ctrl.x > 1500) {
@@ -472,13 +472,22 @@ const IMG = {};
 await Promise.all(['fid_happy', 'fid_talk', 'fid_sad', 'fid_worried', 'fid_sleep', 'fid_front'].map(k => new Promise(res => { const im = new Image(); im.onload = res; im.onerror = res; im.src = '../fidibus/img/' + k + '.png'; IMG[k] = im; })));
 const fidPoses = {}; for (const k in IMG) if (IMG[k].width) fidPoses[k] = { src: IMG[k], face: BOOK_SPR[k].face, w: BOOK_SPR[k].w, eyes: BOOK_EYES[k] };
 const parentPose = kind => { const p = window.FIG.parent(IMG.fid_happy, kind); return { [kind]: { src: p.c, face: p.face, w: BOOK_SPR[kind].w, eyes: p.eyes } }; };
+const BOOK_SPR_BIG = { whale: 1100, star: 300, jelly: 350, turtle: 900, hug: 900 };
 const fidM = makeBookFish('fid', fidPoses), mamaM = makeBookFish('mama', parentPose('mama')), papaM = makeBookFish('papa', parentPose('papa'));
-const whaleM = makeWhale(), starM = makeStar(), jellyM = makeJelly(), turtleM = makeTurtle();
+// Wal, Schildkröte (mit Umarmung), Seestern und Qualle: die gemalten Figuren aus Version 1, ebenfalls aufgeblasen
+const FIGS = window.FIG.build(IMG);
+const bookPose = (k, extra) => ({ src: FIGS[k].c, w: BOOK_SPR_BIG[k], eyes: FIGS[k].eyes, ...extra });
+const whaleM = makeBookFigure('whale', { whale: bookPose('whale', { tail: 'right', fat: 0.6 }) });
+const turtleM = makeBookFigure('turtle', { turtle: bookPose('turtle', { fat: 0.55 }), hug: bookPose('hug', { fat: 0.55 }) });
+const starM = makeBookFigure('star', { star: bookPose('star', { fat: 0.45 }) });
+const jellyM = makeBookFigure('jelly', { jelly: bookPose('jelly', { fat: 0.7, alphaMin: 90, res: 300 }) });
+const jellyLight = new THREE.PointLight(0xd9a6ff, 2.2, 14, 1.6); jellyLight.position.set(0, 1.5, 0.8); jellyM.add(jellyLight);
 scene.add(fidM, mamaM, papaM, whaleM, starM, jellyM, turtleM);
-whaleM.position.set(X(2520) + 6.6, Y(720), 0.4);
-starM.position.set(X(POS.star.x), Y(1300) + 1.0, 0.6); rock(X(POS.star.x), Y(1300) + 0.2, 0.2, 2.2, rockMat2).scale.set(1.7, 0.55, 1.1);
-jellyM.position.set(X(POS.jelly.x), Y(720), 0);
-turtleM.position.set(X(POS.turtle.x) + 1.5, Y(1300) + 1.4, -0.3);
+const WHALE_Y = Y(660), JELLY_Y = Y(948) + 1.4;
+whaleM.position.set(X(3080), WHALE_Y, -1.6);
+starM.position.set(X(4990), Y(1133) + 0.5, 0.6); rock(X(POS.star.x), Y(1300) + 0.2, 0.2, 2.2, rockMat2).scale.set(1.7, 0.55, 1.1);
+jellyM.position.set(X(POS.jelly.x), JELLY_Y, 0);
+turtleM.position.set(X(10540), 4.5, -1.5);
 const collectSprites = [];
 function rebuildCollect() { for (const s of collectSprites) scene.remove(s); collectSprites.length = 0; for (const b of G.collect) { const s = new THREE.Sprite(bubbleMat); s.scale.setScalar(b.r * U * 2.6); s.position.set(X(b.x), Y(b.y), 0.2); s.userData.b = b; scene.add(s); collectSprites.push(s); } }
 const blink = (period, off) => { const ph = (G.t + off) % period; return ph < 0.13 ? Math.sin(ph / 0.13 * Math.PI) : 0; };
@@ -498,13 +507,14 @@ function render3d(dt) {
   syncFish(fidM, G.fid, 'fid', 0.4); syncFish(mamaM, G.mama, 'mama', 1.9); syncFish(papaM, G.papa, 'papa', 3.1);
   // Umarmung: Fidibus schmiegt sich an den Kopf der Schildkröte
   const hug = G.turtle.hug;
-  if (hug > 0.5) { fidM.visible = true; fidM.position.set(turtleM.position.x - 5.0, turtleM.position.y + 0.35, 1.4); fidM.rotation.set(0, 0.35, 0.4); setLids(fidM, true); }
   const line = G.mode === 'dialog' ? G.dialogQueue[G.dialogIdx] : null; const typing = !!(line && G.typed < line.text.length);
   const speaks = who => typing && line.who === who;
-  animTurtle(turtleM, t, { hug, blink: blink(5.6, 3.3), talking: speaks('Oma-Schildkröte') || speaks('Schildkröte') });
-  animWhale(whaleM, t, blink(4.7, 1.3), speaks('Wal')); animJelly(jellyM, t, blink(5.1, 2.2), speaks('Qualle'));
-  jellyM.position.y = Y(720) + Math.sin(t * 1.1) * 0.3; whaleM.position.y = Y(720) + Math.sin(t * 0.6) * 0.18; whaleM.rotation.z = Math.sin(t * 0.6) * 0.02;
-  starM.rotation.y = Math.sin(t * 0.5) * 0.06;
+  animBook(turtleM, t, { pose: hug > 0.5 ? 'hug' : 'turtle', lids: hug > 0.5 ? 0 : (blink(5.6, 3.3) > 0 ? 1 : 0), tilt: Math.sin(t * 0.8) * 0.01 });
+  animBook(whaleM, t, { pose: 'whale', lids: blink(4.7, 1.3) > 0 ? 1 : 0, wag: Math.sin(t * 1.4) * 0.14, tilt: Math.sin(t * 0.6) * 0.015 });
+  const jp = Math.sin(t * 1.6); animBook(jellyM, t, { pose: 'jelly', lids: blink(5.1, 2.2) > 0 ? 1 : 0, pulse: jp * 0.03, tilt: Math.sin(t * 0.8) * 0.04 });
+  jellyLight.intensity = 1.8 + jp * 0.5;
+  animBook(starM, t, { pose: 'star', lids: blink(6.3, 0.7) > 0 ? 1 : 0, tilt: Math.sin(t * 0.5) * 0.02 });
+  jellyM.position.y = JELLY_Y + Math.sin(t * 1.1) * 0.3; whaleM.position.y = WHALE_Y + Math.sin(t * 0.6) * 0.18;
   for (const s of swayers) { const a = Math.sin(t * 1.3 + s.ph) * s.amp; if (s.rot === 'x') s.m.rotation.x += (a - (s.m.userData.prev || 0)), s.m.userData.prev = a; else s.m.rotation.z = a; }
   plankton.position.y = Math.sin(t * 0.2) * 0.3;
   // Sammelblasen
