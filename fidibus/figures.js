@@ -356,13 +356,33 @@ function jelly() {
   return { c, face: 1, eyes: [{ cx: cx - 70, cy: top + 134, rx: 40, ry: 42, col: '#d7a3ec' }, { cx: cx + 70, cy: top + 130, rx: 40, ry: 42, col: '#d7a3ec' }] };
 }
 
+// ───────────── Mama und Papa: aus Fidibus abgeleitet ─────────────
+function parent(img, kind) {
+  const S = 1.5, W = Math.round(img.width * S), H = Math.round(img.height * S); const [c, g] = mk(W, H);
+  g.drawImage(img, 0, 0, W, H);
+  g.save(); g.globalCompositeOperation = 'source-atop';
+  if (kind === 'mama') { g.fillStyle = 'rgba(255,215,140,.22)'; g.fillRect(0, 0, W, H); }
+  else { g.fillStyle = 'rgba(150,55,20,.22)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(80,30,10,.10)'; g.fillRect(0, 0, W, H); }
+  g.restore();
+  // Auge von fid_happy: (90,119) r 32x31 im Original; Bild blickt nach links
+  const ex = 90 * S, ey = 119 * S, rx = 32 * S, ry = 31 * S;
+  if (kind === 'mama') {
+    g.strokeStyle = '#2a1a10'; g.lineWidth = 3.5 * S / 1.5; g.lineCap = 'round';
+    for (let i = 0; i < 3; i++) { const a = -2.1 - i * 0.32; const x0 = ex + Math.cos(a) * rx * 0.95, y0 = ey + Math.sin(a) * ry * 0.95; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + Math.cos(a) * 14, y0 + Math.sin(a) * 14); g.stroke(); }
+    blush(g, ex + 30, ey + 40, 34, 20, 0.3);
+  } else {
+    // Papa: etwas kräftigere Braue
+    g.strokeStyle = 'rgba(90,40,10,.75)'; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.moveTo(ex - rx * 0.9, ey - ry * 1.25); g.quadraticCurveTo(ex, ey - ry * 1.5, ex + rx * 0.9, ey - ry * 1.2); g.stroke();
+  }
+  grain(g, W, H, 0.06);
+  return { c, face: -1, eyes: [{ cx: ex, cy: ey, rx: rx, ry: ry, col: kind === 'mama' ? '#f6a03a' : '#d9731c' }] };
+}
+
 window.FIG = {
-  build() {
+  build(IMG) {
     const out = {};
     out.whale = whale(); out.turtle = turtle(); out.hug = turtle({ hug: true }); out.star = star(); out.jelly = jelly();
-    out.fid_happy = fish({ kind: 'fid' }); out.fid_talk = fish({ kind: 'fid', mouth: 'open' }); out.fid_sad = fish({ kind: 'fid', mouth: 'sad', worried: true });
-    out.fid_worried = fish({ kind: 'fid', worried: true }); out.fid_sleep = fish({ kind: 'fid', eyes: 'closed' }); out.fid_front = fish({ kind: 'fid', front: true });
-    out.mama = fish({ kind: 'mama' }); out.papa = fish({ kind: 'papa' });
+    if (IMG.fid_happy && IMG.fid_happy.width) { out.mama = parent(IMG.fid_happy, 'mama'); out.papa = parent(IMG.fid_happy, 'papa'); }
     return out;
   }
 };

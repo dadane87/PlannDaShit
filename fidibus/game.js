@@ -61,12 +61,12 @@ const SFX = {
 // ───────────── Bilder aus dem Buch ─────────────
 const IMG = {};
 const SPR = {
-  fid_happy: { face: -1, w: 178 }, fid_talk: { face: -1, w: 178 }, fid_sad: { face: -1, w: 178 }, fid_worried: { face: -1, w: 178 },
-  fid_sleep: { face: -1, w: 178 }, fid_front: { face: 1, w: 120 }, mama: { face: -1, w: 250 }, papa: { face: -1, w: 265 },
+  fid_happy: { face: -1, w: 150 }, fid_talk: { face: 1, w: 128 }, fid_sad: { face: 1, w: 142 }, fid_worried: { face: 1, w: 152 },
+  fid_sleep: { face: 1, w: 150 }, fid_front: { face: 1, w: 92 }, mama: { face: -1, w: 215 }, papa: { face: -1, w: 228 },
   whale: { face: 1, w: 1100 }, star: { face: 1, w: 300 }, jelly: { face: 1, w: 350 }, turtle: { face: 1, w: 900 }, hug: { face: 1, w: 900 }
 };
 function loadImages(cb) {
-  const keys = Object.keys(SPR); let n = 0;
+  const keys = ['fid_happy', 'fid_talk', 'fid_sad', 'fid_worried', 'fid_sleep', 'fid_front']; let n = 0;
   const done = () => { if (++n === keys.length) cb(); };
   for (const k of keys) { const im = new Image(); im.onload = done; im.onerror = done; im.src = 'img/' + k + '.png'; IMG[k] = im; }
 }
@@ -695,9 +695,9 @@ function frame(now) {
   update(dt); draw();
 }
 genProps(); makeCollect(); renderMap();
-setTimeout(() => {
-  const f = window.FIG.build(); for (const k in f) { IMG[k] = f[k].c; SPR[k].face = f[k].face; EYES[k] = f[k].eyes; }
-  document.getElementById('loading').style.display = 'none'; last = performance.now(); requestAnimationFrame(frame); }, 30);
+loadImages(() => {
+  const f = window.FIG.build(IMG); for (const k in f) { IMG[k] = f[k].c; SPR[k].face = f[k].face; EYES[k] = f[k].eyes; }
+  document.getElementById('loading').style.display = 'none'; last = performance.now(); requestAnimationFrame(frame); });
 
 // Test-Schnittstelle
 window.FB = { G, POS, HOME, STORY, setScale(v) { scale = v; }, get scale() { return scale; }, drawSpriteAnim, EYES, IMG, SPR, ctx, nextStep, startStory, jumpToStep(i) { G.step = i - 1; nextStep(); }, tp(x, y) { const f = G[G.ctrl || 'fid']; f.x = x; f.y = y; G.cam.x = x; G.cam.y = y; }, advanceDialog, tick(sec) { const n = Math.round(sec * 60); for (let i = 0; i < n; i++) update(1 / 60); }, setTarget(x, y) { G.target = { x, y }; }, draw };
