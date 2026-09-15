@@ -77,6 +77,42 @@ function drawSprite(key, x, y, w, dir = 1, rot = 0, alpha = 1, sy = 1, sx = 1) {
   ctx.save(); ctx.translate(x, y); ctx.scale(dir * sp.face * sx, sy); ctx.rotate(rot * dir * sp.face); ctx.globalAlpha = alpha;
   ctx.drawImage(im, -w / 2, -h / 2, w, h); ctx.restore();
 }
+
+// Augenpositionen in den Bildern (für Blinzeln und geschlossene Augen), Lidfarbe aus dem Bild gesampelt
+const EYES = {"fid_happy":[{"cx":90,"cy":119,"rx":32,"ry":31,"col":"#f08701"}],"fid_talk":[{"cx":186,"cy":68,"rx":16,"ry":17,"col":"#de6f01"}],"fid_sad":[{"cx":232,"cy":88,"rx":20,"ry":17,"col":"#ed6904"}],"fid_worried":[{"cx":256,"cy":125,"rx":23,"ry":30,"col":"#e77902"},{"cx":324,"cy":133,"rx":20,"ry":24,"col":"#c46104"}],"fid_front":[{"cx":87,"cy":81,"rx":15,"ry":14,"col":"#e57100"},{"cx":44,"cy":82,"rx":14,"ry":15,"col":"#e87300"}],"mama":[{"cx":153,"cy":121,"rx":16,"ry":15,"col":"#df6901"},{"cx":209,"cy":119,"rx":16,"ry":15,"col":"#e46f00"}],"papa":[{"cx":83,"cy":141,"rx":19,"ry":21,"col":"#d86300"},{"cx":26,"cy":141,"rx":16,"ry":20,"col":"#db6e07"}],"whale":[{"cx":272,"cy":218,"rx":42,"ry":38,"col":"#074161"}],"star":[{"cx":183,"cy":97,"rx":15,"ry":12,"col":"#db633e"},{"cx":133,"cy":98,"rx":15,"ry":12,"col":"#e4754c"}],"jelly":[{"cx":62,"cy":150,"rx":25,"ry":26,"col":"#f1c2aa"},{"cx":143,"cy":145,"rx":27,"ry":26,"col":"#8b89cd"}],"turtle":[{"cx":203,"cy":205,"rx":36,"ry":27,"col":"#c08f16"}]};
+const blink = (period, off) => ((G.t + off) % period) < 0.13;
+// Animiertes Sprite: Welle durch den Körper (Streifen), optional Lider.
+// o: amp, waves, phase, from (0..1 ab wo die Welle wirkt), axis 'h' (senkrechte Streifen, Versatz in y) oder 'v', headLeft, n, lids, sx, sy
+function drawSpriteAnim(key, x, y, w, dir, rot, alpha, o) {
+  const im = IMG[key]; if (!im || !im.width) return; const sp = SPR[key];
+  const h = w * im.height / im.width, n = o.n || 18, k = w / im.width;
+  ctx.save(); ctx.translate(x, y); ctx.scale(dir * sp.face * (o.sx || 1), o.sy || 1); ctx.rotate(rot * dir * sp.face); ctx.globalAlpha = alpha;
+  if (o.amp) {
+    if (o.axis === 'v') {
+      const sh = im.height / n, dh = h / n;
+      for (let i = 0; i < n; i++) {
+        const v = (i + 0.5) / n, e = Math.max(0, (v - o.from) / (1 - o.from));
+        const dx = o.amp * e * e * Math.sin(o.phase - v * o.waves * 6.283);
+        ctx.drawImage(im, 0, i * sh, im.width, Math.min(sh + 1, im.height - i * sh), -w / 2 + dx, -h / 2 + i * dh, w, dh + 0.7);
+      }
+    } else {
+      const sw = im.width / n, dw = w / n, headLeft = o.headLeft !== undefined ? o.headLeft : sp.face < 0;
+      for (let i = 0; i < n; i++) {
+        const c = (i + 0.5) / n, u = headLeft ? c : 1 - c, e = Math.max(0, (u - o.from) / (1 - o.from));
+        const dy = o.amp * e * e * Math.sin(o.phase - u * o.waves * 6.283);
+        ctx.drawImage(im, i * sw, 0, Math.min(sw + 1, im.width - i * sw), im.height, -w / 2 + i * dw, -h / 2 + dy, dw + 0.7, h);
+      }
+    }
+  } else ctx.drawImage(im, -w / 2, -h / 2, w, h);
+  if (o.lids && EYES[key]) for (const e of EYES[key]) {
+    const ex = (e.cx - im.width / 2) * k, ey = (e.cy - im.height / 2) * k, rx = e.rx * k, ry = e.ry * k;
+    ctx.fillStyle = e.col; ctx.beginPath(); ctx.ellipse(ex, ey, rx, ry, 0, 0, 7); ctx.fill();
+    ctx.strokeStyle = 'rgba(50,25,10,.5)'; ctx.lineWidth = Math.max(1.2, rx * 0.12); ctx.lineCap = 'round';
+    ctx.beginPath(); ctx.ellipse(ex, ey + ry * 0.1, rx * 0.8, ry * 0.45, 0, 0.2, Math.PI - 0.2); ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function drawShadow(x, y, rx, ry, a = 0.35) {
   const g = ctx.createRadialGradient(x, y, 0, x, y, rx); g.addColorStop(0, `rgba(5,15,30,${a})`); g.addColorStop(1, 'rgba(5,15,30,0)');
   ctx.save(); ctx.scale(1, ry / rx); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y * rx / ry, rx, 0, 7); ctx.fill(); ctx.restore();
@@ -289,6 +325,7 @@ function steer(f, dt, speedMax) {
   f.tilt = lerp(f.tilt, clamp(f.vy / 600, -0.5, 0.5) * f.dir, 1 - Math.exp(-6 * dt));
   f.fin += dt * (4 + sp / 60);
   if (sp > 120 && Math.random() < dt * 4) G.particles.push({ x: f.x - f.dir * 30, y: f.y - 10, r: 3 + Math.random() * 4, vy: -30 - Math.random() * 30, life: 1.4 });
+  if (sp > 150 && Math.random() < dt * 1.1) G.particles.push({ x: f.x + f.dir * 62, y: f.y - 12, r: 2.5 + Math.random() * 3.5, vy: -40 - Math.random() * 30, vx: f.dir * 20, life: 1.3 });
 }
 function follow(f, tx, ty, dt, k = 2.5, maxSp = 360) {
   const dx = tx - f.x, dy = ty - f.y, d = Math.hypot(dx, dy);
@@ -588,15 +625,25 @@ function drawHeart(x, y, s, a) {
 }
 function drawFish(f, kind) {
   let key = kind;
-  if (kind === 'fid') key = f.mood === 'sleep' ? 'fid_sleep' : f.mood === 'sad' ? 'fid_sad' : f.mood === 'worried' ? 'fid_worried' : f.talking ? 'fid_talk' : f.mood === 'front' ? 'fid_front' : 'fid_happy';
-  const sp = SPR[key]; const moving = Math.hypot(f.vx, f.vy) > 30;
+  const line = G.mode === 'dialog' ? G.dialogQueue[G.dialogIdx] : null;
+  const typing = !!(line && G.typed < line.text.length);
+  if (kind === 'fid') {
+    key = f.mood === 'sleep' ? 'fid_sleep' : f.mood === 'sad' ? 'fid_sad' : f.mood === 'worried' ? 'fid_worried' : f.mood === 'front' ? 'fid_front' : 'fid_happy';
+    if (f.talking && (f.mood === 'happy' || f.mood === 'front') && typing && Math.floor(G.t * 7) % 2 === 0) key = 'fid_talk';
+  }
+  const sp = SPR[key], speed = Math.hypot(f.vx, f.vy), moving = speed > 30;
   const bob = Math.sin(f.fin * 0.9) * (moving ? 3 : 2.2);
-  const wob = 1 + Math.sin(f.fin * 1.8) * (moving ? 0.035 : 0.012);
+  const wob = 1 + Math.sin(f.fin * 1.8) * (moving ? 0.03 : 0.01);
   const dir = f.mood === 'front' ? 1 : f.dir;
-  drawSprite(key, f.x, f.y + bob, sp.w * (f.scale || 1), dir, f.tilt, f.hidden ? 0 : 1, 1 / Math.sqrt(wob), wob);
+  const off = kind === 'fid' ? 0.4 : kind === 'mama' ? 1.9 : 3.1;
+  const lids = f.mood === 'sleep' ? 'full' : blink(kind === 'fid' ? 4.1 : 5.3, off) ? 'full' : null;
+  let rot = f.tilt; if (f.talking && typing) rot += Math.sin(G.t * 13) * 0.025;
+  drawSpriteAnim(key, f.x, f.y + bob, sp.w * (f.scale || 1), dir, rot, f.hidden ? 0 : 1,
+    { amp: (4 + Math.min(10, speed / 40)) * (key === 'fid_front' ? 0.3 : 1), waves: 1.0, phase: f.fin * 1.1, from: 0.28, n: 18, lids, sx: wob, sy: 1 / Math.sqrt(wob) });
 }
 function drawWhale(x, y) {
-  drawSprite('whale', x + 140, y + 120, SPR.whale.w, 1, Math.sin(G.t * 0.6) * 0.02);
+  drawSpriteAnim('whale', x + 140, y + 120, SPR.whale.w, 1, Math.sin(G.t * 0.6) * 0.015, 1,
+    { axis: 'v', amp: 7, waves: 0.5, phase: G.t * 1.2, from: 0.3, n: 26, lids: blink(4.7, 1.3) ? 'full' : null });
 }
 function drawStarfish(x, y) {
   ctx.save(); ctx.translate(x, y);
@@ -605,7 +652,8 @@ function drawStarfish(x, y) {
   ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-170, 60); ctx.quadraticCurveTo(-160, -50, -30, -56); ctx.quadraticCurveTo(150, -58, 180, 60); ctx.closePath(); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,.10)'; ctx.beginPath(); ctx.ellipse(-50, -28, 60, 14, -0.15, 0, 7); ctx.fill();
   ctx.restore();
-  drawSprite('star', x - 10, y - 108, SPR.star.w, -1, Math.sin(G.t * 0.5) * 0.02);
+  drawSpriteAnim('star', x - 10, y - 108, SPR.star.w, -1, Math.sin(G.t * 0.5) * 0.02, 1,
+    { amp: 3, waves: 1.6, phase: G.t * 1.4, from: 0.05, n: 14, headLeft: true, lids: blink(6.3, 0.5) ? 'full' : null });
 }
 function drawJelly(x, y) {
   ctx.save(); ctx.translate(x, y);
@@ -613,15 +661,18 @@ function drawJelly(x, y) {
   const rg = ctx.createRadialGradient(0, -40, 20, 0, -40, 420); rg.addColorStop(0, `rgba(215,170,255,${0.5 * glow})`); rg.addColorStop(0.5, `rgba(200,150,255,${0.18 * glow})`); rg.addColorStop(1, 'rgba(210,160,255,0)');
   ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, -40, 420, 0, 7); ctx.fill();
   ctx.restore();
-  const sway = Math.sin(G.t * 0.8) * 0.05;
-  drawSprite('jelly', x, y, SPR.jelly.w, 1, sway, 1, 1 + Math.sin(G.t * 1.1) * 0.02, 1 - Math.sin(G.t * 1.1) * 0.02);
+  const pulse = Math.sin(G.t * 1.6);
+  drawSpriteAnim('jelly', x, y, SPR.jelly.w, 1, Math.sin(G.t * 0.8) * 0.04, 1,
+    { axis: 'v', amp: 11, waves: 0.9, phase: G.t * 1.9, from: 0.4, n: 28, lids: blink(5.1, 2.2) ? 'full' : null, sx: 1 + pulse * 0.03, sy: 1 - pulse * 0.025 });
 }
 function drawTurtle(x, y) {
   ctx.save(); ctx.fillStyle = 'rgba(255,240,200,.16)'; ctx.beginPath(); ctx.ellipse(x - 100, 1300, 640, 70, 0, 0, 7); ctx.fill(); ctx.restore();
   const hug = G.turtle.hug; const breathe = 1 + Math.sin(G.t * 1.2) * 0.012;
   drawShadow(x - 20, 1296, 380, 60, 0.4);
-  if (hug < 1) drawSprite('turtle', x, y, SPR.turtle.w, 1, 0, 1 - hug, breathe, 1);
-  if (hug > 0) drawSprite('hug', x - 30, y + 30, SPR.hug.w, 1, Math.sin(G.t * 0.9) * 0.01, hug, breathe, 1);
+  if (hug < 1) drawSpriteAnim('turtle', x, y, SPR.turtle.w, 1, 0, 1 - hug,
+    { amp: 6, waves: 0.55, phase: G.t * 1.0, from: 0.35, n: 24, headLeft: false, lids: blink(5.6, 3.3) ? 'full' : null, sy: breathe });
+  if (hug > 0) drawSpriteAnim('hug', x - 30, y + 30, SPR.hug.w, 1, Math.sin(G.t * 0.9) * 0.01, hug,
+    { amp: 3, waves: 0.5, phase: G.t * 0.9, from: 0.3, n: 20, headLeft: false, sy: breathe });
 }
 
 // Karten-Illustrationen: Seiten aus dem Buch
@@ -641,5 +692,5 @@ genProps(); makeCollect(); renderMap();
 loadImages(() => { document.getElementById('loading').style.display = 'none'; last = performance.now(); requestAnimationFrame(frame); });
 
 // Test-Schnittstelle
-window.FB = { G, POS, HOME, STORY, nextStep, startStory, jumpToStep(i) { G.step = i - 1; nextStep(); }, tp(x, y) { const f = G[G.ctrl || 'fid']; f.x = x; f.y = y; G.cam.x = x; G.cam.y = y; }, advanceDialog, tick(sec) { const n = Math.round(sec * 60); for (let i = 0; i < n; i++) update(1 / 60); }, setTarget(x, y) { G.target = { x, y }; }, draw };
+window.FB = { G, POS, HOME, STORY, drawSpriteAnim, EYES, IMG, SPR, ctx, nextStep, startStory, jumpToStep(i) { G.step = i - 1; nextStep(); }, tp(x, y) { const f = G[G.ctrl || 'fid']; f.x = x; f.y = y; G.cam.x = x; G.cam.y = y; }, advanceDialog, tick(sec) { const n = Math.round(sec * 60); for (let i = 0; i < n; i++) update(1 / 60); }, setTarget(x, y) { G.target = { x, y }; }, draw };
 })();
