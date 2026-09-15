@@ -135,26 +135,28 @@ function whale() {
   return { c, face: 1, eyes: [{ cx: 600, cy: 322, rx: 36, ry: 40, col: '#4577c0' }] };
 }
 
-// ───────────── Oma-Schildkröte (blickt nach links) ─────────────
-function turtle() {
-  const W = 1300, H = 820; const [c, g] = mk(W, H);
+// ───────────── Oma-Schildkröte (blickt nach links); opts.hug = umarmt Fidibus ─────────────
+function turtle(opts = {}) {
+  const W = 1300, H = 820; const [c, g] = mk(W, H); const hug = !!opts.hug;
   const skin = g.createLinearGradient(0, 150, 0, 720); skin.addColorStop(0, '#c2c078'); skin.addColorStop(0.5, '#979e55'); skin.addColorStop(1, '#5a6430');
   const scales = (clipFn, x0, y0, cols, rows, r, step, a = 0.3) => { g.save(); clipFn(); g.clip(); for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) { const x = x0 + i * step + (j % 2) * step / 2, y = y0 + j * step * 0.9; const sg = g.createRadialGradient(x - r * 0.3, y - r * 0.3, 1, x, y, r); sg.addColorStop(0, `rgba(235,230,170,${a * 0.8})`); sg.addColorStop(1, `rgba(50,60,20,${a * 0.6})`); g.fillStyle = sg; g.beginPath(); g.arc(x, y, r, 0, TAU); g.fill(); stroke(g, 1.5, `rgba(50,60,20,${a})`); g.stroke(); } g.restore(); };
-  // Schwanz + hintere Flosse
   const tail = () => { g.beginPath(); g.moveTo(1140, 470); g.quadraticCurveTo(1240, 470, 1275, 520); g.quadraticCurveTo(1210, 535, 1140, 520); g.closePath(); };
   const rear = () => { g.beginPath(); g.moveTo(1000, 560); g.quadraticCurveTo(1130, 560, 1225, 665); g.quadraticCurveTo(1100, 665, 960, 610); g.closePath(); };
   g.fillStyle = '#6f7a3c'; tail(); g.fill(); rear(); g.fill(); scales(rear, 990, 570, 6, 4, 13, 34, 0.25); stroke(g, 3, 'rgba(45,50,18,.45)'); rear(); g.stroke();
-  // Hals mit Falten
   const neck = () => { g.beginPath(); g.moveTo(400, 250); g.quadraticCurveTo(500, 210, 600, 260); g.lineTo(600, 500); g.quadraticCurveTo(500, 545, 400, 495); g.closePath(); };
   g.fillStyle = skin; neck(); g.fill(); scales(neck, 400, 255, 6, 8, 15, 40, 0.28);
   g.save(); neck(); g.clip(); stroke(g, 3, 'rgba(45,50,18,.4)'); for (let i = 0; i < 5; i++) { g.beginPath(); g.moveTo(405, 300 + i * 42); g.quadraticCurveTo(500, 280 + i * 42, 595, 310 + i * 42); g.stroke(); } g.restore();
-  // Vorderflosse: breites Paddel nach links vorn, mit Platten
-  const flip = () => { g.beginPath(); g.moveTo(600, 480); g.quadraticCurveTo(470, 560, 280, 600); g.quadraticCurveTo(150, 630, 80, 610); g.quadraticCurveTo(70, 560, 140, 535); g.quadraticCurveTo(300, 470, 460, 430); g.quadraticCurveTo(560, 410, 600, 430); g.closePath(); };
-  const fg = g.createLinearGradient(0, 430, 0, 630); fg.addColorStop(0, '#bdbd72'); fg.addColorStop(1, '#66703a');
-  g.fillStyle = fg; flip(); g.fill(); scales(flip, 90, 445, 13, 6, 15, 42, 0.3);
-  g.save(); flip(); g.clip(); stroke(g, 3, 'rgba(45,50,18,.45)'); g.beginPath(); g.moveTo(600, 480); g.quadraticCurveTo(470, 560, 280, 600); g.stroke(); stroke(g, 2, 'rgba(45,50,18,.3)'); for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(560 - i * 40, 445 + i * 15); g.quadraticCurveTo(350 - i * 30, 520 + i * 20, 110, 580 + i * 10); g.stroke(); } g.restore();
-  stroke(g, 3, 'rgba(45,50,18,.35)'); flip(); g.stroke();
-  // Kopf: groß und rund, Schuppen, Falten
+  // Vorderflosse: normal = Paddel nach links vorn; hug = nach oben gebogen, umschließt Fidibus
+  const flip = hug
+    ? () => { g.beginPath(); g.moveTo(600, 470); g.quadraticCurveTo(470, 585, 320, 610); g.quadraticCurveTo(200, 625, 170, 545); g.quadraticCurveTo(160, 470, 240, 445); g.quadraticCurveTo(300, 430, 330, 470); g.quadraticCurveTo(400, 445, 520, 425); g.quadraticCurveTo(570, 418, 600, 430); g.closePath(); }
+    : () => { g.beginPath(); g.moveTo(600, 480); g.quadraticCurveTo(470, 560, 280, 600); g.quadraticCurveTo(150, 630, 80, 610); g.quadraticCurveTo(70, 560, 140, 535); g.quadraticCurveTo(300, 470, 460, 430); g.quadraticCurveTo(560, 410, 600, 430); g.closePath(); };
+  const drawFlip = () => {
+    const fg = g.createLinearGradient(0, 430, 0, 630); fg.addColorStop(0, '#bdbd72'); fg.addColorStop(1, '#66703a');
+    g.fillStyle = fg; flip(); g.fill(); scales(flip, 90, 445, 13, 6, 15, 42, 0.3);
+    g.save(); flip(); g.clip(); stroke(g, 3, 'rgba(45,50,18,.45)'); g.beginPath(); if (hug) { g.moveTo(600, 470); g.quadraticCurveTo(470, 585, 320, 610); } else { g.moveTo(600, 480); g.quadraticCurveTo(470, 560, 280, 600); } g.stroke(); g.restore();
+    stroke(g, 3, 'rgba(45,50,18,.35)'); flip(); g.stroke();
+  };
+  if (!hug) drawFlip();
   const head = () => { g.beginPath(); g.moveTo(120, 330); g.bezierCurveTo(115, 220, 210, 150, 330, 155); g.bezierCurveTo(450, 160, 520, 240, 515, 340); g.bezierCurveTo(510, 440, 420, 500, 300, 495); g.bezierCurveTo(190, 490, 125, 430, 120, 330); g.closePath(); };
   g.fillStyle = skin; head(); g.fill(); scales(head, 120, 160, 10, 9, 16, 44, 0.26);
   g.save(); head(); g.clip();
@@ -162,7 +164,6 @@ function turtle() {
   stroke(g, 3, 'rgba(45,50,18,.45)'); for (let i = 0; i < 3; i++) { g.beginPath(); g.moveTo(200 + i * 25, 205 + i * 12); g.quadraticCurveTo(300, 185 + i * 12, 400 - i * 10, 210 + i * 12); g.stroke(); }
   g.restore();
   stroke(g, 3, 'rgba(45,50,18,.35)'); head(); g.stroke();
-  // Panzer: hohe Kuppel mit Platten, Wachstumsringen, Randschuppen, Algenflecken
   const shell = () => { g.beginPath(); g.moveTo(440, 545); g.bezierCurveTo(410, 280, 540, 90, 790, 80); g.bezierCurveTo(1030, 70, 1180, 280, 1180, 520); g.bezierCurveTo(1120, 575, 720, 590, 440, 545); g.closePath(); };
   const sg = g.createRadialGradient(640, 190, 30, 800, 330, 540); sg.addColorStop(0, '#d8d094'); sg.addColorStop(0.45, '#8f9350'); sg.addColorStop(1, '#3a4320');
   g.fillStyle = sg; shell(); g.fill();
@@ -175,31 +176,116 @@ function turtle() {
     const pg = g.createRadialGradient(x - r * 0.4, y - r * 0.4, 2, x, y, r); pg.addColorStop(0, 'rgba(240,232,170,.5)'); pg.addColorStop(0.6, 'rgba(130,135,65,.15)'); pg.addColorStop(1, 'rgba(30,35,10,.5)');
     g.fillStyle = pg; plate(x, y, r, rot); g.fill();
     stroke(g, 8, 'rgba(35,40,12,.8)'); plate(x, y, r - 4, rot); g.stroke();
-    // Wachstumsringe
     for (let k = 1; k <= 3; k++) { stroke(g, 1.5, `rgba(240,232,170,${0.28 - k * 0.06})`); plate(x + k * 3, y + k * 3, r - 8 - k * 11, rot); g.stroke(); }
   }
-  // Algen / Alter
   speckle(g, shell, 26, 'rgba(60,110,60,.22)', 10, 30, 41); speckle(g, shell, 40, 'rgba(240,235,200,.18)', 2, 6, 43);
-  // Saum mit Randschuppen
   const rim = g.createLinearGradient(0, 470, 0, 600); rim.addColorStop(0, 'rgba(90,100,45,0)'); rim.addColorStop(0.45, 'rgba(130,135,64,.96)'); rim.addColorStop(1, 'rgba(55,60,28,1)');
   g.fillStyle = rim; g.fillRect(400, 460, 820, 150);
   stroke(g, 4, 'rgba(35,40,12,.6)'); g.beginPath(); g.moveTo(440, 520); g.quadraticCurveTo(790, 565, 1180, 500); g.stroke();
   for (let i = 0; i < 14; i++) { const x = 470 + i * 52; g.beginPath(); g.moveTo(x, 525 + Math.sin(i / 13 * Math.PI) * 30); g.lineTo(x + 6, 580); g.stroke(); stroke(g, 2, 'rgba(240,232,170,.25)'); g.beginPath(); g.moveTo(x + 8, 528 + Math.sin(i / 13 * Math.PI) * 30); g.lineTo(x + 14, 580); g.stroke(); stroke(g, 4, 'rgba(35,40,12,.6)'); }
   g.restore();
   stroke(g, 3, 'rgba(35,40,12,.45)'); shell(); g.stroke();
-  // Auge: groß, braune Iris, schweres Lid, unteres Lid
-  eye(g, 268, 318, 62, 66, { px: -0.05, py: 0.1, pr: 0.74, iris: '#7a5230', iris2: '#2a1a0c', lid: 0.42, lidCol: '#a8ad60', lidLine: 'rgba(50,45,15,.65)', rim: 'rgba(50,45,15,.45)' });
-  stroke(g, 4, 'rgba(50,45,15,.4)'); g.beginPath(); g.moveTo(215, 372); g.quadraticCurveTo(268, 392, 322, 372); g.stroke();
+  // Auge: normal groß mit schwerem Lid; beim Umarmen zufrieden geschlossen
+  if (hug) {
+    stroke(g, 7, 'rgba(50,45,15,.7)'); g.beginPath(); g.moveTo(215, 325); g.quadraticCurveTo(268, 285, 322, 325); g.stroke();
+    stroke(g, 4, 'rgba(50,45,15,.35)'); g.beginPath(); g.moveTo(230, 345); g.quadraticCurveTo(268, 360, 306, 345); g.stroke();
+  } else {
+    eye(g, 268, 318, 62, 66, { px: -0.05, py: 0.1, pr: 0.74, iris: '#7a5230', iris2: '#2a1a0c', lid: 0.42, lidCol: '#a8ad60', lidLine: 'rgba(50,45,15,.65)', rim: 'rgba(50,45,15,.45)' });
+    stroke(g, 4, 'rgba(50,45,15,.4)'); g.beginPath(); g.moveTo(215, 372); g.quadraticCurveTo(268, 392, 322, 372); g.stroke();
+  }
   stroke(g, 7, 'rgba(50,45,15,.55)'); g.beginPath(); g.moveTo(200, 238); g.quadraticCurveTo(268, 205, 340, 240); g.stroke();
-  // Nase und Lächeln
   g.fillStyle = 'rgba(50,45,15,.6)'; g.beginPath(); g.ellipse(150, 365, 7, 5, 0, 0, TAU); g.fill(); g.beginPath(); g.ellipse(168, 372, 5, 4, 0, 0, TAU); g.fill();
-  stroke(g, 7, 'rgba(45,40,15,.78)'); g.beginPath(); g.moveTo(135, 405); g.quadraticCurveTo(250, 460, 385, 415); g.stroke();
+  stroke(g, 7, 'rgba(45,40,15,.78)'); g.beginPath(); g.moveTo(135, 405); g.quadraticCurveTo(250, hug ? 470 : 460, 385, 415); g.stroke();
   stroke(g, 4, 'rgba(45,40,15,.5)'); g.beginPath(); g.moveTo(380, 413); g.quadraticCurveTo(398, 402, 400, 388); g.stroke();
-  blush(g, 240, 410, 60, 34, 0.3);
+  blush(g, 240, 410, 60, 34, hug ? 0.42 : 0.3);
+  if (hug) {
+    // Fidibus im Arm (kleiner, leicht geneigt, glücklich mit geschlossenen Augen), dann Flosse darüber
+    const f = fish({ kind: 'fid', mouth: 'smile', eyes: 'closed' }).c;
+    g.save(); g.translate(318, 425); g.rotate(-0.45); g.scale(-0.78, 0.78); g.drawImage(f, -f.width / 2, -f.height / 2); g.restore();
+    drawFlip();
+  }
   light(g, W, H, 540, 140, 780, 0.34, 1060, 740, 860, 0.5);
   mottle(g, W, H, 70, 'rgba(240,230,150,A)', 30, 120, 0.14, 11); mottle(g, W, H, 50, 'rgba(40,50,10,A)', 30, 140, 0.12, 13);
   grain(g, W, H, 0.16);
-  return { c, face: 1, eyes: [{ cx: 268, cy: 322, rx: 68, ry: 70, col: '#a8ad60' }] };
+  return { c, face: 1, eyes: hug ? [] : [{ cx: 268, cy: 322, rx: 68, ry: 70, col: '#a8ad60' }] };
+}
+
+// ───────────── Fische (Fidibus, Mama, Papa) – gemalt, Blick nach links ─────────────
+// opts: kind 'fid'|'mama'|'papa', mouth 'smile'|'open'|'sad', eyes 'open'|'closed', worried, front
+function fish(opts = {}) {
+  const kind = opts.kind || 'fid';
+  const W = 460, H = 380; const [c, g] = mk(W, H);
+  const pal = kind === 'mama' ? { top: '#ffb650', mid: '#fb9a2e', low: '#d86f14', belly: '#ffd98a', fin: '#d6e06a', fin2: '#8fb23a' }
+            : kind === 'papa' ? { top: '#ff9a34', mid: '#ea7a18', low: '#b3540c', belly: '#f9bd66', fin: '#bfc95a', fin2: '#789a30' }
+            : { top: '#ffa53a', mid: '#f5851f', low: '#c85e10', belly: '#ffd27a', fin: '#cfdb5e', fin2: '#86ad36' };
+  const finGrad = (x0, y0, x1, y1) => { const fg = g.createLinearGradient(x0, y0, x1, y1); fg.addColorStop(0, pal.fin); fg.addColorStop(1, pal.fin2); return fg; };
+  const rays = (pts, n, col) => { stroke(g, 2, col); for (let i = 0; i < n; i++) { const t = (i + 0.5) / n; g.beginPath(); g.moveTo(pts[0][0], pts[0][1]); const x = pts[1][0] + (pts[2][0] - pts[1][0]) * t, y = pts[1][1] + (pts[2][1] - pts[1][1]) * t; g.quadraticCurveTo((pts[0][0] + x) / 2 + 6, (pts[0][1] + y) / 2 + (t - 0.5) * 20, x, y); g.stroke(); } };
+  if (opts.front) {
+    // Frontalansicht: runder Körper, zwei Augen, Flossen seitlich
+    const cx = 230, cy = 200;
+    for (const sx of [-1, 1]) { g.save(); g.translate(cx, cy); g.scale(sx, 1); g.fillStyle = finGrad(120, 200, 190, 260); g.globalAlpha = 0.9; g.beginPath(); g.moveTo(110, 20); g.quadraticCurveTo(170, 20, 195, 70); g.quadraticCurveTo(160, 75, 110, 50); g.closePath(); g.fill(); g.restore(); }
+    g.fillStyle = finGrad(230, 40, 230, 110); g.globalAlpha = 0.95; g.beginPath(); g.moveTo(cx - 40, cy - 105); g.quadraticCurveTo(cx, cy - 175, cx + 40, cy - 105); g.closePath(); g.fill(); g.globalAlpha = 1;
+    const body = () => { g.beginPath(); g.ellipse(cx, cy, 128, 122, 0, 0, TAU); g.closePath(); };
+    const bg = g.createRadialGradient(cx - 50, cy - 60, 10, cx, cy, 150); bg.addColorStop(0, pal.top); bg.addColorStop(0.55, pal.mid); bg.addColorStop(1, pal.low);
+    g.fillStyle = bg; body(); g.fill();
+    g.save(); body(); g.clip(); const bl = g.createRadialGradient(cx, cy + 70, 10, cx, cy + 60, 110); bl.addColorStop(0, pal.belly); bl.addColorStop(1, 'rgba(255,200,100,0)'); g.fillStyle = bl; g.fillRect(0, 0, W, H);
+    stroke(g, 1.5, 'rgba(150,60,10,.25)'); for (let r = 0; r < 4; r++) for (let i = -3; i <= 3; i++) { g.beginPath(); g.arc(cx + i * 34 + (r % 2) * 17, cy - 90 + r * 26, 14, 0.2, Math.PI - 0.2); g.stroke(); } g.restore();
+    const eyeOpts = { px: 0, py: 0.1, pr: 0.62, iris: '#6b4a2c', iris2: '#1c120a', lid: opts.worried ? 0.3 : 0.14, lidCol: pal.mid, lidLine: 'rgba(120,50,10,.5)', rim: 'rgba(120,50,10,.35)' };
+    for (const sx of [-1, 1]) { if (opts.eyes === 'closed') { stroke(g, 5, 'rgba(120,50,10,.7)'); g.beginPath(); g.moveTo(cx + sx * 50 - 22, cy - 12); g.quadraticCurveTo(cx + sx * 50, cy - 40, cx + sx * 50 + 22, cy - 12); g.stroke(); } else eye(g, cx + sx * 50, cy - 20, 30, 34, eyeOpts); if (kind === 'mama') { stroke(g, 3.5, 'rgba(60,30,10,.85)'); for (let i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(cx + sx * (50 + i * 14), cy - 52); g.lineTo(cx + sx * (50 + i * 16) + sx * 4, cy - 66); g.stroke(); } } }
+    if (kind === 'papa') { stroke(g, 6, 'rgba(120,50,10,.7)'); for (const sx of [-1, 1]) { g.beginPath(); g.moveTo(cx + sx * 24, cy - 60); g.quadraticCurveTo(cx + sx * 52, cy - 76, cx + sx * 80, cy - 60); g.stroke(); } }
+    if (opts.mouth === 'open') { g.fillStyle = '#7a2438'; g.beginPath(); g.ellipse(cx, cy + 52, 34, 26, 0, 0, TAU); g.fill(); g.fillStyle = '#e8788f'; g.beginPath(); g.ellipse(cx, cy + 66, 22, 12, 0, 0, TAU); g.fill(); stroke(g, 4, 'rgba(120,50,10,.7)'); g.beginPath(); g.ellipse(cx, cy + 52, 34, 26, 0, 0, TAU); g.stroke(); }
+    else { g.fillStyle = '#7a2438'; g.beginPath(); g.moveTo(cx - 36, cy + 40); g.quadraticCurveTo(cx, cy + 92, cx + 36, cy + 40); g.quadraticCurveTo(cx, cy + 58, cx - 36, cy + 40); g.closePath(); g.fill(); stroke(g, 4.5, 'rgba(120,50,10,.7)'); g.beginPath(); g.moveTo(cx - 36, cy + 40); g.quadraticCurveTo(cx, cy + 92, cx + 36, cy + 40); g.stroke(); }
+    blush(g, cx - 82, cy + 22, 28, 18, 0.4); blush(g, cx + 82, cy + 22, 28, 18, 0.4);
+    light(g, W, H, cx - 60, cy - 90, 240, 0.24, cx + 80, cy + 110, 220, 0.3);
+    mottle(g, W, H, 24, 'rgba(255,225,160,A)', 15, 60, 0.14, 21); mottle(g, W, H, 12, 'rgba(150,50,10,A)', 15, 50, 0.08, 23);
+    grain(g, W, H, 0.1);
+    return { c, face: 1, eyes: opts.eyes === 'closed' ? [] : [{ cx: cx - 50, cy: cy - 18, rx: 34, ry: 38, col: pal.mid }, { cx: cx + 50, cy: cy - 18, rx: 34, ry: 38, col: pal.mid }] };
+  }
+  // Seitenansicht (Kopf links)
+  const cx = 225, cy = 195;
+  // Schwanzflosse: groß, gefächert
+  g.fillStyle = finGrad(320, 190, 455, 190); g.globalAlpha = 0.94;
+  g.beginPath(); g.moveTo(322, 170); g.quadraticCurveTo(370, 95, 452, 72); g.quadraticCurveTo(422, 150, 428, 195); g.quadraticCurveTo(422, 240, 452, 318); g.quadraticCurveTo(370, 295, 322, 222); g.closePath(); g.fill(); g.globalAlpha = 1;
+  rays([[330, 196], [448, 80], [448, 310]], 9, 'rgba(80,105,25,.4)');
+  // Rückenflosse: hoch, gewellt
+  g.fillStyle = finGrad(230, 30, 230, 110); g.globalAlpha = 0.95;
+  g.beginPath(); g.moveTo(140, 108); g.quadraticCurveTo(170, 18, 240, 24); g.quadraticCurveTo(290, 28, 330, 112); g.closePath(); g.fill(); g.globalAlpha = 1;
+  rays([[235, 112], [160, 45], [315, 65]], 7, 'rgba(80,105,25,.4)');
+  // Bauchflossen
+  g.fillStyle = finGrad(280, 285, 300, 350); g.globalAlpha = 0.92; g.beginPath(); g.moveTo(250, 292); g.quadraticCurveTo(280, 352, 335, 345); g.quadraticCurveTo(302, 305, 300, 278); g.closePath(); g.fill(); g.globalAlpha = 1;
+  // Körper: vorn rund und dick, hinten zum Schwanz verjüngt
+  const body = () => { g.beginPath(); g.moveTo(80, 198); g.bezierCurveTo(82, 112, 150, 72, 225, 76); g.bezierCurveTo(295, 80, 335, 125, 342, 190); g.bezierCurveTo(345, 255, 300, 312, 222, 314); g.bezierCurveTo(145, 314, 80, 275, 80, 198); g.closePath(); };
+  const bg = g.createRadialGradient(145, 125, 8, cx, cy, 180); bg.addColorStop(0, pal.top); bg.addColorStop(0.5, pal.mid); bg.addColorStop(1, pal.low);
+  g.fillStyle = bg; body(); g.fill();
+  g.save(); body(); g.clip();
+  const bl = g.createRadialGradient(165, 285, 10, 185, 262, 135); bl.addColorStop(0, pal.belly); bl.addColorStop(1, 'rgba(255,200,100,0)'); g.fillStyle = bl; g.fillRect(0, 0, W, H);
+  stroke(g, 1.8, 'rgba(160,60,10,.3)'); for (let r = 0; r < 7; r++) for (let i = 0; i < 6; i++) { const x = 188 + i * 28 + (r % 2) * 14, y = 106 + r * 31; g.beginPath(); g.arc(x, y, 13, 0.25, Math.PI - 0.25); g.stroke(); }
+  const sh = g.createRadialGradient(170, 110, 5, 190, 125, 90); sh.addColorStop(0, 'rgba(255,245,215,.55)'); sh.addColorStop(1, 'rgba(255,245,215,0)'); g.fillStyle = sh; g.fillRect(0, 0, W, H);
+  const rimD = g.createLinearGradient(0, 240, 0, 320); rimD.addColorStop(0, 'rgba(120,40,0,0)'); rimD.addColorStop(1, 'rgba(120,40,0,.35)'); g.fillStyle = rimD; g.fillRect(0, 230, W, 100);
+  g.restore();
+  stroke(g, 2.5, 'rgba(150,60,10,.3)'); body(); g.stroke();
+  // Brustflosse
+  g.fillStyle = finGrad(175, 215, 120, 300); g.globalAlpha = 0.92; g.beginPath(); g.moveTo(178, 222); g.quadraticCurveTo(155, 285, 100, 305); g.quadraticCurveTo(125, 245, 160, 214); g.closePath(); g.fill(); g.globalAlpha = 1;
+  rays([[176, 224], [140, 268], [104, 300]], 5, 'rgba(80,105,25,.4)');
+  // Auge
+  const ex = 140, ey = 160;
+  if (opts.eyes === 'closed') { stroke(g, 5, 'rgba(120,50,10,.75)'); g.beginPath(); g.moveTo(ex - 26, ey + 6); g.quadraticCurveTo(ex, ey - 28, ex + 26, ey + 6); g.stroke(); }
+  else {
+    eye(g, ex, ey, 38, 42, { px: -0.12, py: opts.mouth === 'sad' ? 0.16 : 0.08, pr: 0.64, iris: '#6b4a2c', iris2: '#1c120a', lid: opts.worried ? 0.32 : 0.12, lidCol: pal.mid, lidLine: 'rgba(120,50,10,.5)', rim: 'rgba(120,50,10,.35)' });
+    if (kind === 'mama') { stroke(g, 3.5, 'rgba(60,30,10,.85)'); for (let i = 0; i < 3; i++) { const a = -2.2 - i * 0.3; g.beginPath(); g.moveTo(ex + Math.cos(a) * 38, ey + Math.sin(a) * 42); g.lineTo(ex + Math.cos(a) * 52, ey + Math.sin(a) * 56); g.stroke(); } }
+  }
+  // Braue
+  stroke(g, kind === 'papa' ? 6 : 4, 'rgba(120,50,10,.6)'); g.beginPath();
+  if (opts.mouth === 'sad' || opts.worried) { g.moveTo(112, 112); g.quadraticCurveTo(140, 104, 172, 120); } else { g.moveTo(108, 118); g.quadraticCurveTo(140, 98, 174, 112); } g.stroke();
+  // Mund
+  if (opts.mouth === 'open') { g.fillStyle = '#7a2438'; g.beginPath(); g.ellipse(100, 222, 20, 24, -0.3, 0, TAU); g.fill(); g.fillStyle = '#e8788f'; g.beginPath(); g.ellipse(104, 234, 13, 9, -0.3, 0, TAU); g.fill(); stroke(g, 4, 'rgba(120,50,10,.7)'); g.beginPath(); g.ellipse(100, 222, 20, 24, -0.3, 0, TAU); g.stroke(); }
+  else if (opts.mouth === 'sad') { g.fillStyle = '#7a2438'; g.beginPath(); g.ellipse(102, 228, 9, 11, 0, 0, TAU); g.fill(); stroke(g, 4, 'rgba(120,50,10,.7)'); g.beginPath(); g.ellipse(102, 228, 9, 11, 0, 0, TAU); g.stroke(); }
+  else { g.fillStyle = '#7a2438'; g.beginPath(); g.moveTo(88, 214); g.quadraticCurveTo(105, 248, 138, 226); g.quadraticCurveTo(110, 232, 88, 214); g.closePath(); g.fill(); stroke(g, 4.5, 'rgba(120,50,10,.7)'); g.beginPath(); g.moveTo(88, 214); g.quadraticCurveTo(105, 248, 138, 226); g.stroke(); stroke(g, 3, 'rgba(120,50,10,.35)'); g.beginPath(); g.moveTo(138, 226); g.quadraticCurveTo(146, 220, 146, 212); g.stroke(); }
+  blush(g, 125, 226, 30, 18, opts.mouth === 'sad' ? 0.2 : 0.4);
+  light(g, W, H, 150, 100, 240, 0.22, 310, 300, 220, 0.3);
+  mottle(g, W, H, 24, 'rgba(255,225,160,A)', 15, 60, 0.14, 21); mottle(g, W, H, 12, 'rgba(150,50,10,A)', 15, 50, 0.08, 23);
+  grain(g, W, H, 0.1);
+  return { c, face: -1, eyes: opts.eyes === 'closed' ? [] : [{ cx: ex, cy: ey + 2, rx: 42, ry: 46, col: pal.mid }] };
 }
 
 // ───────────── Seestern (freundlich) ─────────────
@@ -270,34 +356,13 @@ function jelly() {
   return { c, face: 1, eyes: [{ cx: cx - 70, cy: top + 134, rx: 40, ry: 42, col: '#d7a3ec' }, { cx: cx + 70, cy: top + 130, rx: 40, ry: 42, col: '#d7a3ec' }] };
 }
 
-// ───────────── Mama und Papa: aus Fidibus abgeleitet ─────────────
-function parent(img, kind) {
-  const S = 1.5, W = Math.round(img.width * S), H = Math.round(img.height * S); const [c, g] = mk(W, H);
-  g.drawImage(img, 0, 0, W, H);
-  g.save(); g.globalCompositeOperation = 'source-atop';
-  if (kind === 'mama') { g.fillStyle = 'rgba(255,215,140,.22)'; g.fillRect(0, 0, W, H); }
-  else { g.fillStyle = 'rgba(150,55,20,.22)'; g.fillRect(0, 0, W, H); g.globalCompositeOperation = 'source-atop'; g.fillStyle = 'rgba(80,30,10,.10)'; g.fillRect(0, 0, W, H); }
-  g.restore();
-  // Auge von fid_happy: (90,119) r 32x31 im Original; Bild blickt nach links
-  const ex = 90 * S, ey = 119 * S, rx = 32 * S, ry = 31 * S;
-  if (kind === 'mama') {
-    g.strokeStyle = '#2a1a10'; g.lineWidth = 3.5 * S / 1.5; g.lineCap = 'round';
-    for (let i = 0; i < 3; i++) { const a = -2.1 - i * 0.32; const x0 = ex + Math.cos(a) * rx * 0.95, y0 = ey + Math.sin(a) * ry * 0.95; g.beginPath(); g.moveTo(x0, y0); g.lineTo(x0 + Math.cos(a) * 14, y0 + Math.sin(a) * 14); g.stroke(); }
-    blush(g, ex + 30, ey + 40, 34, 20, 0.3);
-  } else {
-    // Papa: etwas kräftigere Braue
-    g.strokeStyle = 'rgba(90,40,10,.75)'; g.lineWidth = 5; g.lineCap = 'round'; g.beginPath(); g.moveTo(ex - rx * 0.9, ey - ry * 1.25); g.quadraticCurveTo(ex, ey - ry * 1.5, ex + rx * 0.9, ey - ry * 1.2); g.stroke();
-  }
-  grain(g, W, H, 0.06);
-  return { c, face: -1, eyes: [{ cx: ex, cy: ey, rx: rx, ry: ry, col: kind === 'mama' ? '#f6a03a' : '#d9731c' }] };
-}
-
 window.FIG = {
-  build(IMG) {
+  build() {
     const out = {};
-    out.whale = whale(); out.turtle = turtle(); out.star = star();
-    out.jelly = jelly();
-    if (IMG.fid_happy && IMG.fid_happy.width) { out.mama = parent(IMG.fid_happy, 'mama'); out.papa = parent(IMG.fid_happy, 'papa'); }
+    out.whale = whale(); out.turtle = turtle(); out.hug = turtle({ hug: true }); out.star = star(); out.jelly = jelly();
+    out.fid_happy = fish({ kind: 'fid' }); out.fid_talk = fish({ kind: 'fid', mouth: 'open' }); out.fid_sad = fish({ kind: 'fid', mouth: 'sad', worried: true });
+    out.fid_worried = fish({ kind: 'fid', worried: true }); out.fid_sleep = fish({ kind: 'fid', eyes: 'closed' }); out.fid_front = fish({ kind: 'fid', front: true });
+    out.mama = fish({ kind: 'mama' }); out.papa = fish({ kind: 'papa' });
     return out;
   }
 };

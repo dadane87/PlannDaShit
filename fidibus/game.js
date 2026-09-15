@@ -61,9 +61,9 @@ const SFX = {
 // ───────────── Bilder aus dem Buch ─────────────
 const IMG = {};
 const SPR = {
-  fid_happy: { face: -1, w: 150 }, fid_talk: { face: 1, w: 128 }, fid_sad: { face: 1, w: 142 }, fid_worried: { face: 1, w: 152 },
-  fid_sleep: { face: 1, w: 150 }, fid_front: { face: 1, w: 92 }, mama: { face: -1, w: 215 }, papa: { face: -1, w: 228 },
-  whale: { face: 1, w: 1100 }, star: { face: 1, w: 300 }, jelly: { face: 1, w: 350 }, turtle: { face: 1, w: 900 }, hug: { face: 1, w: 760 }
+  fid_happy: { face: -1, w: 178 }, fid_talk: { face: -1, w: 178 }, fid_sad: { face: -1, w: 178 }, fid_worried: { face: -1, w: 178 },
+  fid_sleep: { face: -1, w: 178 }, fid_front: { face: 1, w: 120 }, mama: { face: -1, w: 250 }, papa: { face: -1, w: 265 },
+  whale: { face: 1, w: 1100 }, star: { face: 1, w: 300 }, jelly: { face: 1, w: 350 }, turtle: { face: 1, w: 900 }, hug: { face: 1, w: 900 }
 };
 function loadImages(cb) {
   const keys = Object.keys(SPR); let n = 0;
@@ -677,14 +677,14 @@ function drawTurtle(x, y) {
   drawShadow(x - 20, 1296, 380, 60, 0.4);
   if (hug < 1) drawSpriteAnim('turtle', x + 40, y - 10, SPR.turtle.w, 1, 0, 1 - hug,
     { amp: 5, waves: 0.55, phase: G.t * 1.0, from: 0.3, n: 24, headLeft: false, lids: blink(5.6, 3.3) ? 'full' : null, sy: breathe });
-  if (hug > 0) drawSpriteAnim('hug', x - 30, y + 30, SPR.hug.w, 1, Math.sin(G.t * 0.9) * 0.01, hug,
+  if (hug > 0) drawSpriteAnim('hug', x + 40, y - 10, SPR.hug.w, 1, 0, hug,
     { amp: 3, waves: 0.5, phase: G.t * 0.9, from: 0.3, n: 20, headLeft: false, sy: breathe });
 }
 
 // Karten-Illustrationen: Seiten aus dem Buch
 function drawCardArt(el, kind) {
-  const map = { family: 'p22', night: 'p06', parents: 'p22', cover: 'p04', sleep: 'p24', map: 'p18' };
-  el.src = 'img/' + (map[kind] || 'p22') + '.jpg';
+  const map = { family: 's-familie', night: 'S-nacht', parents: 's-eltern', cover: 's-familie', sleep: 's-schlaf' };
+  el.src = 'img/' + (map[kind] || 's-familie').toLowerCase() + '.jpg';
 }
 
 // ───────────── Schleife ─────────────
@@ -695,9 +695,9 @@ function frame(now) {
   update(dt); draw();
 }
 genProps(); makeCollect(); renderMap();
-loadImages(() => {
-  if (window.FIG) { const f = window.FIG.build(IMG); for (const k in f) { IMG[k] = f[k].c; SPR[k].face = f[k].face; EYES[k] = f[k].eyes; } }
-  document.getElementById('loading').style.display = 'none'; last = performance.now(); requestAnimationFrame(frame); });
+setTimeout(() => {
+  const f = window.FIG.build(); for (const k in f) { IMG[k] = f[k].c; SPR[k].face = f[k].face; EYES[k] = f[k].eyes; }
+  document.getElementById('loading').style.display = 'none'; last = performance.now(); requestAnimationFrame(frame); }, 30);
 
 // Test-Schnittstelle
 window.FB = { G, POS, HOME, STORY, setScale(v) { scale = v; }, get scale() { return scale; }, drawSpriteAnim, EYES, IMG, SPR, ctx, nextStep, startStory, jumpToStep(i) { G.step = i - 1; nextStep(); }, tp(x, y) { const f = G[G.ctrl || 'fid']; f.x = x; f.y = y; G.cam.x = x; G.cam.y = y; }, advanceDialog, tick(sec) { const n = Math.round(sec * 60); for (let i = 0; i < n; i++) update(1 / 60); }, setTarget(x, y) { G.target = { x, y }; }, draw };
