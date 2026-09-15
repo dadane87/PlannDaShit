@@ -62,8 +62,8 @@ const SFX = {
 const IMG = {};
 const SPR = {
   fid_happy: { face: -1, w: 150 }, fid_talk: { face: 1, w: 128 }, fid_sad: { face: 1, w: 142 }, fid_worried: { face: 1, w: 152 },
-  fid_sleep: { face: 1, w: 150 }, fid_front: { face: 1, w: 92 }, mama: { face: 1, w: 210 }, papa: { face: -1, w: 218 },
-  whale: { face: 1, w: 600 }, star: { face: 1, w: 280 }, jelly: { face: 1, w: 320 }, turtle: { face: 1, w: 760 }, hug: { face: 1, w: 760 }
+  fid_sleep: { face: 1, w: 150 }, fid_front: { face: 1, w: 92 }, mama: { face: -1, w: 215 }, papa: { face: -1, w: 228 },
+  whale: { face: 1, w: 1100 }, star: { face: 1, w: 300 }, jelly: { face: 1, w: 350 }, turtle: { face: 1, w: 900 }, hug: { face: 1, w: 760 }
 };
 function loadImages(cb) {
   const keys = Object.keys(SPR); let n = 0;
@@ -343,7 +343,7 @@ function update(dt) {
   // Herauszoomen bei großen Figuren (Wal, Schildkröte), damit sie ins Bild passen
   const who = G.ctrl ? G[G.ctrl] : G.fid;
   let zt = 1;
-  if (who.x > POS.whale.x - 700 && who.x < POS.whale.x + 500) zt = H > W ? 0.68 : 0.85;
+  if (who.x > POS.whale.x - 700 && who.x < POS.whale.x + 500) zt = H > W ? 0.56 : 0.8;
   else if (who.x > POS.turtle.x - 800) zt = H > W ? 0.8 : 0.92;
   if (G.mode === 'title' || G.mode === 'cards') zt = zoom;
   zoom += (zt - zoom) * (1 - Math.exp(-2.5 * dt)); scale = baseScale * zoom;
@@ -433,7 +433,7 @@ function update(dt) {
   if (G.mode === 'cut' && G.cut === 'reunion') focus = { x: POS.turtle.x - 400, y: POS.turtle.y + 20 };
   if (G.mode === 'cut' && G.cut === 'night' || G.mode === 'end') focus = { x: HOME.x + 40, y: HOME.y + 60 };
   if (G.mode === 'title') focus = { x: HOME.x + 200, y: 900 };
-  if (G.mode === 'dialog' && G.stationsDone.size >= 0 && ctrl.x > 1500) focus = { x: ctrl.x + 240 * (st && st.family ? -1 : 1), y: ctrl.y + 330 };
+  if (G.mode === 'dialog' && G.stationsDone.size >= 0 && ctrl.x > 1500) focus = { x: ctrl.x + (ctrl.x > POS.whale.x - 700 && ctrl.x < POS.whale.x + 500 ? 330 : 240) * (st && st.family ? -1 : 1), y: ctrl.y + 330 };
   const visW = W / scale, visH = H / scale;
   const tx = clamp(focus.x + (G.mode === 'play' && !st.family ? (G[st.who] === G.fid ? 120 : 120) : 0) * (focus.dir || 1) * (st && st.family ? 0 : 1), visW / 2, WORLD_W - visW / 2);
   const extra = (G.mode === 'dialog' || G.mode === 'cut') ? 300 : 0;   // bei Dialogen darf die Kamera tiefer, damit die Box nichts verdeckt
@@ -642,8 +642,8 @@ function drawFish(f, kind) {
     { amp: (4 + Math.min(10, speed / 40)) * (key === 'fid_front' ? 0.3 : 1), waves: 1.0, phase: f.fin * 1.1, from: 0.28, n: 18, lids, sx: wob, sy: 1 / Math.sqrt(wob) });
 }
 function drawWhale(x, y) {
-  drawSpriteAnim('whale', x + 140, y + 120, SPR.whale.w, 1, Math.sin(G.t * 0.6) * 0.015, 1,
-    { axis: 'v', amp: 7, waves: 0.5, phase: G.t * 1.2, from: 0.3, n: 26, lids: blink(4.7, 1.3) ? 'full' : null });
+  drawSpriteAnim('whale', x + SPR.whale.w / 2 - 170, y + 40, SPR.whale.w, 1, Math.sin(G.t * 0.6) * 0.015, 1,
+    { amp: 16, waves: 0.7, phase: G.t * 1.4, from: 0.35, n: 30, headLeft: true, lids: blink(4.7, 1.3) ? 'full' : null });
 }
 function drawStarfish(x, y) {
   ctx.save(); ctx.translate(x, y);
@@ -652,7 +652,7 @@ function drawStarfish(x, y) {
   ctx.fillStyle = g; ctx.beginPath(); ctx.moveTo(-170, 60); ctx.quadraticCurveTo(-160, -50, -30, -56); ctx.quadraticCurveTo(150, -58, 180, 60); ctx.closePath(); ctx.fill();
   ctx.fillStyle = 'rgba(255,255,255,.10)'; ctx.beginPath(); ctx.ellipse(-50, -28, 60, 14, -0.15, 0, 7); ctx.fill();
   ctx.restore();
-  drawSpriteAnim('star', x - 10, y - 108, SPR.star.w, -1, Math.sin(G.t * 0.5) * 0.02, 1,
+  drawSpriteAnim('star', x - 10, y - 112, SPR.star.w, -1, Math.sin(G.t * 0.5) * 0.02, 1,
     { amp: 3, waves: 1.6, phase: G.t * 1.4, from: 0.05, n: 14, headLeft: true, lids: blink(6.3, 0.5) ? 'full' : null });
 }
 function drawJelly(x, y) {
@@ -662,15 +662,15 @@ function drawJelly(x, y) {
   ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, -40, 420, 0, 7); ctx.fill();
   ctx.restore();
   const pulse = Math.sin(G.t * 1.6);
-  drawSpriteAnim('jelly', x, y, SPR.jelly.w, 1, Math.sin(G.t * 0.8) * 0.04, 1,
-    { axis: 'v', amp: 11, waves: 0.9, phase: G.t * 1.9, from: 0.4, n: 28, lids: blink(5.1, 2.2) ? 'full' : null, sx: 1 + pulse * 0.03, sy: 1 - pulse * 0.025 });
+  drawSpriteAnim('jelly', x, y + 140, SPR.jelly.w, 1, Math.sin(G.t * 0.8) * 0.04, 1,
+    { axis: 'v', amp: 16, waves: 1.1, phase: G.t * 1.9, from: 0.33, n: 34, lids: blink(5.1, 2.2) ? 'full' : null, sx: 1 + pulse * 0.03, sy: 1 - pulse * 0.025 });
 }
 function drawTurtle(x, y) {
   ctx.save(); ctx.fillStyle = 'rgba(255,240,200,.16)'; ctx.beginPath(); ctx.ellipse(x - 100, 1300, 640, 70, 0, 0, 7); ctx.fill(); ctx.restore();
   const hug = G.turtle.hug; const breathe = 1 + Math.sin(G.t * 1.2) * 0.012;
   drawShadow(x - 20, 1296, 380, 60, 0.4);
-  if (hug < 1) drawSpriteAnim('turtle', x, y, SPR.turtle.w, 1, 0, 1 - hug,
-    { amp: 6, waves: 0.55, phase: G.t * 1.0, from: 0.35, n: 24, headLeft: false, lids: blink(5.6, 3.3) ? 'full' : null, sy: breathe });
+  if (hug < 1) drawSpriteAnim('turtle', x + 40, y - 10, SPR.turtle.w, 1, 0, 1 - hug,
+    { amp: 5, waves: 0.55, phase: G.t * 1.0, from: 0.3, n: 24, headLeft: false, lids: blink(5.6, 3.3) ? 'full' : null, sy: breathe });
   if (hug > 0) drawSpriteAnim('hug', x - 30, y + 30, SPR.hug.w, 1, Math.sin(G.t * 0.9) * 0.01, hug,
     { amp: 3, waves: 0.5, phase: G.t * 0.9, from: 0.3, n: 20, headLeft: false, sy: breathe });
 }
@@ -689,7 +689,9 @@ function frame(now) {
   update(dt); draw();
 }
 genProps(); makeCollect(); renderMap();
-loadImages(() => { document.getElementById('loading').style.display = 'none'; last = performance.now(); requestAnimationFrame(frame); });
+loadImages(() => {
+  if (window.FIG) { const f = window.FIG.build(IMG); for (const k in f) { IMG[k] = f[k].c; SPR[k].face = f[k].face; EYES[k] = f[k].eyes; } }
+  document.getElementById('loading').style.display = 'none'; last = performance.now(); requestAnimationFrame(frame); });
 
 // Test-Schnittstelle
 window.FB = { G, POS, HOME, STORY, drawSpriteAnim, EYES, IMG, SPR, ctx, nextStep, startStory, jumpToStep(i) { G.step = i - 1; nextStep(); }, tp(x, y) { const f = G[G.ctrl || 'fid']; f.x = x; f.y = y; G.cam.x = x; G.cam.y = y; }, advanceDialog, tick(sec) { const n = Math.round(sec * 60); for (let i = 0; i < n; i++) update(1 / 60); }, setTarget(x, y) { G.target = { x, y }; }, draw };
