@@ -486,7 +486,7 @@ const jellyLight = new THREE.PointLight(0xd9a6ff, 2.2, 14, 1.6); jellyLight.posi
 scene.add(fidM, mamaM, papaM, whaleM, starM, jellyM, turtleM);
 const WHALE_Y = Y(660), JELLY_Y = Y(948) + 1.4;
 whaleM.position.set(X(3080), WHALE_Y, -1.6);
-starM.position.set(X(4990), Y(1133) + 0.5, 0.6); rock(X(POS.star.x), Y(1300) + 0.2, 0.2, 2.2, rockMat2).scale.set(1.7, 0.55, 1.1);
+starM.position.set(X(4990), Y(1300) + 0.2 + 1.21 + 1.6, 1.0); rock(X(POS.star.x), Y(1300) + 0.2, -0.6, 2.2, rockMat2).scale.set(1.7, 0.55, 1.1);   // sitzt auf dem Felsen, vor ihm
 jellyM.position.set(X(POS.jelly.x), JELLY_Y, 0);
 turtleM.position.set(X(10540), 4.5, -1.5);
 const collectSprites = [];
