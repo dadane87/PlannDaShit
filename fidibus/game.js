@@ -700,5 +700,5 @@ loadImages(() => {
   document.getElementById('loading').style.display = 'none'; last = performance.now(); requestAnimationFrame(frame); });
 
 // Test-Schnittstelle
-window.FB = { G, POS, HOME, STORY, drawSpriteAnim, EYES, IMG, SPR, ctx, nextStep, startStory, jumpToStep(i) { G.step = i - 1; nextStep(); }, tp(x, y) { const f = G[G.ctrl || 'fid']; f.x = x; f.y = y; G.cam.x = x; G.cam.y = y; }, advanceDialog, tick(sec) { const n = Math.round(sec * 60); for (let i = 0; i < n; i++) update(1 / 60); }, setTarget(x, y) { G.target = { x, y }; }, draw };
+window.FB = { G, POS, HOME, STORY, setScale(v) { scale = v; }, get scale() { return scale; }, drawSpriteAnim, EYES, IMG, SPR, ctx, nextStep, startStory, jumpToStep(i) { G.step = i - 1; nextStep(); }, tp(x, y) { const f = G[G.ctrl || 'fid']; f.x = x; f.y = y; G.cam.x = x; G.cam.y = y; }, advanceDialog, tick(sec) { const n = Math.round(sec * 60); for (let i = 0; i < n; i++) update(1 / 60); }, setTarget(x, y) { G.target = { x, y }; }, draw };
 })();
