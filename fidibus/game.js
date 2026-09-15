@@ -163,7 +163,7 @@ const STORY = [
     S('Erzähler', 'Doch bevor der Wal den Satz beenden konnte, war Fidibus schon wieder weg. Zisch!')
   ] },
   { type: 'dash', who: 'fid', dx: 900 },
-  { type: 'play', who: 'fid', untilX: POS.star.x - 260, station: 'star' },
+  { type: 'play', who: 'fid', untilX: POS.star.x - 340, station: 'star' },
   { type: 'dialog', lines: [
     S('Fidibus', '„He, du! Wo finde ich die Schildkröten?“'),
     S('Seestern', '„Immer der Nase nach, mein Kleiner, dort hinten beim Seegras.“'),
@@ -345,6 +345,8 @@ function update(dt) {
   let zt = 1;
   if (who.x > POS.whale.x - 700 && who.x < POS.whale.x + 500) zt = H > W ? 0.56 : 0.8;
   else if (who.x > POS.turtle.x - 800) zt = H > W ? 0.8 : 0.92;
+  else if (who.x > POS.star.x - 600 && who.x < POS.star.x + 400) zt = H > W ? 0.86 : 0.95;
+  else if (who.x > POS.jelly.x - 600 && who.x < POS.jelly.x + 400) zt = H > W ? 0.8 : 0.92;
   if (G.mode === 'title' || G.mode === 'cards') zt = zoom;
   zoom += (zt - zoom) * (1 - Math.exp(-2.5 * dt)); scale = baseScale * zoom;
   const st = G.stepData;
@@ -433,7 +435,11 @@ function update(dt) {
   if (G.mode === 'cut' && G.cut === 'reunion') focus = { x: POS.turtle.x - 400, y: POS.turtle.y + 20 };
   if (G.mode === 'cut' && G.cut === 'night' || G.mode === 'end') focus = { x: HOME.x + 40, y: HOME.y + 60 };
   if (G.mode === 'title') focus = { x: HOME.x + 200, y: 900 };
-  if (G.mode === 'dialog' && G.stationsDone.size >= 0 && ctrl.x > 1500) focus = { x: ctrl.x + (ctrl.x > POS.whale.x - 700 && ctrl.x < POS.whale.x + 500 ? 330 : 240) * (st && st.family ? -1 : 1), y: ctrl.y + 330 };
+  if (G.mode === 'dialog' && G.stationsDone.size >= 0 && ctrl.x > 1500) {
+    const nearWhale = ctrl.x > POS.whale.x - 700 && ctrl.x < POS.whale.x + 500, nearStar = ctrl.x > POS.star.x - 600 && ctrl.x < POS.star.x + 400, nearJelly = ctrl.x > POS.jelly.x - 600 && ctrl.x < POS.jelly.x + 400;
+    const dx = nearWhale ? 330 : nearStar ? 210 : 240, dy = nearStar ? 200 : nearJelly ? 60 : 330;
+    focus = { x: ctrl.x + dx * (st && st.family ? -1 : 1), y: ctrl.y + dy };
+  }
   const visW = W / scale, visH = H / scale;
   const tx = clamp(focus.x + (G.mode === 'play' && !st.family ? (G[st.who] === G.fid ? 120 : 120) : 0) * (focus.dir || 1) * (st && st.family ? 0 : 1), visW / 2, WORLD_W - visW / 2);
   const extra = (G.mode === 'dialog' || G.mode === 'cut') ? 300 : 0;   // bei Dialogen darf die Kamera tiefer, damit die Box nichts verdeckt
@@ -658,11 +664,11 @@ function drawStarfish(x, y) {
 function drawJelly(x, y) {
   ctx.save(); ctx.translate(x, y);
   const glow = 0.5 + Math.sin(G.t * 2) * 0.15 + G.jelly.glow * 0.3;
-  const rg = ctx.createRadialGradient(0, -40, 20, 0, -40, 420); rg.addColorStop(0, `rgba(215,170,255,${0.5 * glow})`); rg.addColorStop(0.5, `rgba(200,150,255,${0.18 * glow})`); rg.addColorStop(1, 'rgba(210,160,255,0)');
-  ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, -40, 420, 0, 7); ctx.fill();
+  const rg = ctx.createRadialGradient(0, 100, 20, 0, 100, 420); rg.addColorStop(0, `rgba(215,170,255,${0.5 * glow})`); rg.addColorStop(0.5, `rgba(200,150,255,${0.18 * glow})`); rg.addColorStop(1, 'rgba(210,160,255,0)');
+  ctx.fillStyle = rg; ctx.beginPath(); ctx.arc(0, 100, 420, 0, 7); ctx.fill();
   ctx.restore();
   const pulse = Math.sin(G.t * 1.6);
-  drawSpriteAnim('jelly', x, y + 140, SPR.jelly.w, 1, Math.sin(G.t * 0.8) * 0.04, 1,
+  drawSpriteAnim('jelly', x, y + 328, SPR.jelly.w, 1, Math.sin(G.t * 0.8) * 0.04, 1,
     { axis: 'v', amp: 16, waves: 1.1, phase: G.t * 1.9, from: 0.33, n: 34, lids: blink(5.1, 2.2) ? 'full' : null, sx: 1 + pulse * 0.03, sy: 1 - pulse * 0.025 });
 }
 function drawTurtle(x, y) {
