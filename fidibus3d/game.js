@@ -68,8 +68,8 @@ const G = {
   mode: 'title', t: 0, step: -1, stepData: null,
   cam: { x: HOME.x, y: 900 },
   fid: { x: HOME.x, y: HOME.y, vx: 0, vy: 0, dir: 1, tilt: 0, fin: 0, eyes: 'open', mood: 'happy', scale: 1, hidden: false },
-  mama: { x: HOME.x - 70, y: HOME.y + 40, vx: 0, vy: 0, dir: 1, tilt: 0, fin: 0, eyes: 'closed', mood: 'sleep', hidden: false },
-  papa: { x: HOME.x + 60, y: HOME.y + 50, vx: 0, vy: 0, dir: -1, tilt: 0, fin: 0, eyes: 'closed', mood: 'sleep', hidden: false },
+  mama: { x: HOME.x - 150, y: HOME.y + 40, vx: 0, vy: 0, dir: 1, tilt: 0, fin: 0, eyes: 'closed', mood: 'sleep', hidden: false },
+  papa: { x: HOME.x + 150, y: HOME.y + 50, vx: 0, vy: 0, dir: -1, tilt: 0, fin: 0, eyes: 'closed', mood: 'sleep', hidden: false },
   ctrl: null,             // welches Wesen gesteuert wird
   target: null, keys: {}, bubbles: 0, mut: 1, dark: 0, moon: 0, night: 0,
   collect: [], particles: [], hearts: [], trail: [],
@@ -249,8 +249,8 @@ $('again').addEventListener('click', () => { $('end').classList.remove('show'); 
 function startStory() {
   G.step = -1; G.bubbles = 0; G.mut = 1; G.dark = 0; G.moon = 0; G.night = 0; G.stationsDone = new Set(); G.current = 'home';
   Object.assign(G.fid, { x: HOME.x, y: HOME.y, vx: 0, vy: 0, dir: 1, eyes: 'open', mood: 'happy', hidden: false, scale: 1 });
-  Object.assign(G.mama, { x: HOME.x - 70, y: HOME.y + 40, vx: 0, vy: 0, dir: 1, eyes: 'closed', mood: 'sleep', hidden: false });
-  Object.assign(G.papa, { x: HOME.x + 60, y: HOME.y + 50, vx: 0, vy: 0, dir: -1, eyes: 'closed', mood: 'sleep', hidden: false });
+  Object.assign(G.mama, { x: HOME.x - 150, y: HOME.y + 40, vx: 0, vy: 0, dir: 1, eyes: 'closed', mood: 'sleep', hidden: false });
+  Object.assign(G.papa, { x: HOME.x + 150, y: HOME.y + 50, vx: 0, vy: 0, dir: -1, eyes: 'closed', mood: 'sleep', hidden: false });
   G.turtle.hug = 0; G.hearts = []; G.trail = []; G.homeArrived = false; G.blubbed = false; G.particles = []; G.cam.x = HOME.x; G.cam.y = 900;
   makeCollect(); if (window.FB) FB.rebuildCollect(); renderMap(); $('bubbles').textContent = '🫧 0';
   nextStep();
@@ -295,7 +295,9 @@ function update(dt) {
   else if (who.x > POS.turtle.x - 800) zt = H > W ? 0.8 : 0.92;
   else if (who.x > POS.star.x - 600 && who.x < POS.star.x + 400) zt = H > W ? 0.86 : 0.95;
   else if (who.x > POS.jelly.x - 600 && who.x < POS.jelly.x + 400) zt = H > W ? 0.8 : 0.92;
+  if (who.x < 900 && G.mode !== 'title') zt = H > W ? 0.8 : 0.9;
   if (G.mode === 'title' || G.mode === 'cards') zt = zoom;
+  if (G.zoomOverride) zt = G.zoomOverride;
   zoom += (zt - zoom) * (1 - Math.exp(-2.5 * dt)); scale = baseScale * zoom;
   const st = G.stepData;
   if (G.hintT > 0) { G.hintT -= dt; if (G.hintT <= 0) $('hint').classList.remove('show'); }
@@ -351,14 +353,14 @@ function update(dt) {
     } else if (G.cut === 'reunion') {
       G.turtle.hug = lerp(G.turtle.hug, 0, 1 - Math.exp(-3 * dt)); if (G.turtle.hug < 0.5) G.fid.hidden = false;
       const mx = POS.turtle.x - 520, my = POS.turtle.y - 120;
-      follow(G.mama, mx, my, dt, 3, 400); follow(G.papa, mx - 90, my + 60, dt, 3, 400);
-      if (p > 0.25) { follow(G.fid, mx + 40, my + 40, dt, 4, 700); G.fid.dir = -1; if (p > 0.6) G.fid.mood = 'front'; }
+      follow(G.mama, mx - 60, my - 20, dt, 3, 400); follow(G.papa, mx - 260, my + 90, dt, 3, 400);
+      if (p > 0.25) { follow(G.fid, mx + 130, my + 60, dt, 4, 700); G.fid.dir = -1; if (p > 0.6) G.fid.mood = 'front'; }
       if (p > 0.45 && Math.random() < dt * 4) G.hearts.push({ x: mx + (Math.random() - 0.5) * 200, y: my - 40, life: 1.8, vx: (Math.random() - 0.5) * 30 });
       if (G.t > 1.1 && G.t < 1.2) SFX.hug();
       G.mama.mood = G.papa.mood = 'happy';
     } else if (G.cut === 'night') {
       G.night = smooth(0, 0.5, p); G.moon = smooth(0.1, 0.7, p);
-      follow(G.fid, HOME.x + 10, HOME.y + 20, dt, 2, 250); follow(G.mama, HOME.x - 80, HOME.y - 30, dt, 2, 250); follow(G.papa, HOME.x + 95, HOME.y - 20, dt, 2, 250);
+      follow(G.fid, HOME.x + 10, HOME.y + 20, dt, 2, 250); follow(G.mama, HOME.x - 200, HOME.y - 30, dt, 2, 250); follow(G.papa, HOME.x + 230, HOME.y - 20, dt, 2, 250);
       G.mama.dir = 1; G.papa.dir = -1;
       if (p > 0.6) { G.fid.mood = 'sleep'; G.fid.dir = 1; }
       if (p > 0.85) { G.mama.eyes = G.papa.eyes = 'closed'; G.mama.mood = G.papa.mood = 'sleep'; }
@@ -468,7 +470,7 @@ function spriteFrom(kind) { const arr = pool[kind]; const s = arr.find(x => !x.v
 const fidM = makeFish('fid'), mamaM = makeFish('mama'), papaM = makeFish('papa');
 const whaleM = makeWhale(), starM = makeStar(), jellyM = makeJelly(), turtleM = makeTurtle();
 scene.add(fidM, mamaM, papaM, whaleM, starM, jellyM, turtleM);
-whaleM.position.set(X(2500) + 4.2, Y(700), 0.4);
+whaleM.position.set(X(2520) + 6.6, Y(720), 0.4);
 starM.position.set(X(POS.star.x), Y(1300) + 1.0, 0.6); rock(X(POS.star.x), Y(1300) + 0.2, 0.2, 2.2, rockMat2).scale.set(1.7, 0.55, 1.1);
 jellyM.position.set(X(POS.jelly.x), Y(720), 0);
 turtleM.position.set(X(POS.turtle.x) + 1.5, Y(1300) + 1.4, -0.3);
@@ -478,9 +480,9 @@ const blink = (period, off) => { const ph = (G.t + off) % period; return ph < 0.
 
 function syncFish(m, f, kind, off) {
   m.visible = !f.hidden;
-  m.position.set(X(f.x), Y(f.y) + Math.sin(f.fin * 0.9) * 0.03, 0);
+  m.position.set(X(f.x), Y(f.y) + Math.sin(f.fin * 0.9) * 0.03, kind === 'mama' ? -0.6 : kind === 'papa' ? 0.3 : 0);
   const front = f.mood === 'front';
-  const yaw = front ? -Math.PI / 2 : (f.dir > 0 ? Math.PI : 0);
+  const yaw = front ? Math.PI / 2 : (f.dir > 0 ? Math.PI : 0);
   m.rotation.set(0, yaw, (f.dir > 0 ? 1 : -1) * -f.tilt * 0.8 * (front ? 0 : 1));
   const line = G.mode === 'dialog' ? G.dialogQueue[G.dialogIdx] : null; const typing = !!(line && G.typed < line.text.length);
   animFish(m, G.t + off, { moving: Math.hypot(f.vx, f.vy) > 30, speed: Math.hypot(f.vx, f.vy) / 100, mood: f.mood, talking: f.talking && typing, blink: blink(kind === 'fid' ? 4.1 : 5.3, off) });
@@ -492,9 +494,11 @@ function render3d(dt) {
   // Umarmung: Fidibus schmiegt sich an den Kopf der Schildkröte
   const hug = G.turtle.hug;
   if (hug > 0.5) { fidM.visible = true; fidM.position.set(turtleM.position.x - 5.2, turtleM.position.y + 0.1, 0.9); fidM.rotation.set(0, Math.PI * 0.75, 0.45); setLids(fidM, true); }
-  animTurtle(turtleM, t, { hug, blink: blink(5.6, 3.3) });
-  animWhale(whaleM, t, blink(4.7, 1.3)); animJelly(jellyM, t, blink(5.1, 2.2));
-  jellyM.position.y = Y(720) + Math.sin(t * 1.1) * 0.3; whaleM.position.y = Y(700) + Math.sin(t * 0.6) * 0.18; whaleM.rotation.z = Math.sin(t * 0.6) * 0.02;
+  const line = G.mode === 'dialog' ? G.dialogQueue[G.dialogIdx] : null; const typing = !!(line && G.typed < line.text.length);
+  const speaks = who => typing && line.who === who;
+  animTurtle(turtleM, t, { hug, blink: blink(5.6, 3.3), talking: speaks('Oma-Schildkröte') || speaks('Schildkröte') });
+  animWhale(whaleM, t, blink(4.7, 1.3), speaks('Wal')); animJelly(jellyM, t, blink(5.1, 2.2), speaks('Qualle'));
+  jellyM.position.y = Y(720) + Math.sin(t * 1.1) * 0.3; whaleM.position.y = Y(720) + Math.sin(t * 0.6) * 0.18; whaleM.rotation.z = Math.sin(t * 0.6) * 0.02;
   starM.rotation.y = Math.sin(t * 0.5) * 0.06;
   for (const s of swayers) { const a = Math.sin(t * 1.3 + s.ph) * s.amp; if (s.rot === 'x') s.m.rotation.x += (a - (s.m.userData.prev || 0)), s.m.userData.prev = a; else s.m.rotation.z = a; }
   plankton.position.y = Math.sin(t * 0.2) * 0.3;
@@ -542,4 +546,4 @@ const _startStory = startStory;
 document.getElementById('loading').style.display = 'none';
 requestAnimationFrame(frame);
 
-window.FB = { G, POS, HOME, STORY, scene, camera, renderer, nextStep, startStory, jumpToStep(i) { G.step = i - 1; nextStep(); }, tp(x, y) { const f = G[G.ctrl || 'fid']; f.x = x; f.y = y; G.cam.x = x; G.cam.y = y; }, advanceDialog, tick(sec) { const n = Math.round(sec * 60); for (let i = 0; i < n; i++) update(1 / 60); }, setTarget(x, y) { G.target = { x, y }; }, draw: () => render3d(0), rebuildCollect, setZoom(v) { zoom = v; } };
+window.FB = { G, POS, HOME, STORY, scene, camera, renderer, nextStep, startStory, jumpToStep(i) { G.step = i - 1; nextStep(); }, tp(x, y) { const f = G[G.ctrl || 'fid']; f.x = x; f.y = y; G.cam.x = x; G.cam.y = y; }, advanceDialog, tick(sec) { const n = Math.round(sec * 60); for (let i = 0; i < n; i++) update(1 / 60); }, setTarget(x, y) { G.target = { x, y }; }, draw: () => render3d(0), rebuildCollect, setZoom(v) { zoom = v; G.zoomOverride = v; } };
