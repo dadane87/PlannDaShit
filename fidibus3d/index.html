@@ -7,8 +7,8 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Fidibus">
-<title>Fidibus und der Weg nach Hause</title>
+<meta name="apple-mobile-web-app-title" content="Fidibus 3D">
+<title>Fidibus 3D – Der Weg nach Hause</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
@@ -65,11 +65,15 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0b2a4a;font
 .legend span{flex:1;background:#f1ebdc;border-radius:10px;padding:6px 4px}
 .pagenum{font-size:11px;color:#a0937a;margin-top:10px;font-weight:700}
 #cardArt,.art{width:100%;height:170px;object-fit:cover;border-radius:16px;margin-bottom:10px;display:block;box-shadow:0 4px 14px rgba(0,0,0,.25)}
+#fade{position:fixed;inset:0;background:#02060f;opacity:0;pointer-events:none;transition:opacity .2s}
+#vig{position:fixed;inset:0;background:radial-gradient(circle at 50% 55%, rgba(2,8,20,0) 18%, rgba(2,8,20,.95) 62%);opacity:0;pointer-events:none}
 #loading{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#0b2a4a;color:#fff;font-weight:800;z-index:30}
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div id="vig"></div>
+<div id="fade"></div>
 <div id="hud">
   <div id="map"></div>
   <div id="bubbles">🫧 0</div>
@@ -82,10 +86,11 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0b2a4a;font
     <img class="art" src="img/s-titel.jpg" alt="" style="height:200px;object-position:50% 60%">
     <h2>Eine Gutenachtgeschichte</h2>
     <h1>Fidibus und der<br>Weg nach Hause</h1>
+    <div style="font-size:12px;font-weight:800;color:#8a7a5a;margin:-4px 0 8px">Version 2 · in 3D</div>
     <p>Tief unten im blauen Meer lebt ein kleiner, aufgeweckter Fisch namens Fidibus. Er hat einen großen Traum: Er will die uralten, weisen Schildkröten kennenlernen.</p>
     <button class="go" id="go">Geschichte spielen</button>
     <div class="legend"><span>👆 Finger halten: Fidibus schwimmt dorthin</span><span>🫧 Luftblasen sammeln</span><span>📖 Tippen: weiterlesen</span></div>
-    <a href="../fidibus3d/" style="display:block;margin-top:10px;font-size:12px;font-weight:800;color:#8a7a5a">Zur 3D-Version 2 →</a>
+    <a href="../fidibus/" style="display:block;margin-top:10px;font-size:12px;font-weight:800;color:#8a7a5a">Zur gemalten Version 1 →</a>
   </div>
 </div>
 
@@ -110,7 +115,6 @@ html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0b2a4a;font
 </div>
 
 <div id="loading">Fidibus schwimmt heran …</div>
-<script src="figures.js"></script>
-<script src="game.js"></script>
+<script type="module" src="game.js"></script>
 </body>
 </html>

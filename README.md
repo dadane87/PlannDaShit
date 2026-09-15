@@ -1,5 +1,9 @@
 # Familien-Retreat 17.8. – 6.9.2026
 
+> **Neu: [Fidibus 3D (Version 2)](fidibus3d/)** – dieselbe Geschichte als echtes 3D-Spiel (three.js):
+> alle Figuren als 3D-Modelle mit Licht, Schatten, Nebel und einer Kamera, die schräg mitfährt.
+> Adresse: `https://dadane87.github.io/PlannDaShit/fidibus3d/` · Steuerung wie in Version 1.
+
 > **Neu: [Fidibus und der Weg nach Hause](fidibus/)** – das Bilderbuch als Spiel. Man schwimmt
 > als Fidibus den ganzen Weg der Geschichte: vom Riff zum Wal, zum Seestern, durch das dunkle
 > Wasser, zur Qualle, durch das Seegras zur Oma-Schildkröte. Dann suchen Mama und Papa, und zum
