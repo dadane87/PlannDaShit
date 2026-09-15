@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0b2a4a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fidibus">
+<title>Fidibus und der Weg nach Hause</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --safe-t:env(safe-area-inset-top,0px);--safe-b:env(safe-area-inset-bottom,0px);
+  --safe-l:env(safe-area-inset-left,0px);--safe-r:env(safe-area-inset-right,0px);
+  --font:'Avenir Next','Nunito','Segoe UI',system-ui,-apple-system,sans-serif;
+  --paper:#fff7e6;--ink:#2b2a33;--accent:#f28c28;--deep:#0b2a4a;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0;height:100%;overflow:hidden;background:#0b2a4a;font-family:var(--font);color:var(--ink);
+  touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:none}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none}
+#hud{position:fixed;inset:0;pointer-events:none}
+
+/* Stationen-Karte oben */
+#map{position:absolute;left:calc(10px + var(--safe-l));right:calc(10px + var(--safe-r));top:calc(8px + var(--safe-t));
+  display:flex;justify-content:center;gap:4px;flex-wrap:wrap}
+.st{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;
+  font-size:17px;opacity:.5;transition:all .4s;border:2px solid transparent}
+.st.done{opacity:.9;background:rgba(255,255,255,.28)}
+.st.now{opacity:1;background:rgba(242,140,40,.9);border-color:#fff;transform:scale(1.15);box-shadow:0 0 14px rgba(242,140,40,.8)}
+#bubbles{position:absolute;right:calc(12px + var(--safe-r));top:calc(52px + var(--safe-t));color:#fff;font-weight:800;font-size:15px;
+  background:rgba(0,0,0,.25);padding:4px 10px;border-radius:999px;text-shadow:0 1px 2px rgba(0,0,0,.5)}
+#hint{position:absolute;left:16px;right:16px;bottom:calc(30px + var(--safe-b));text-align:center;color:#fff;font-weight:700;font-size:14px;
+  text-shadow:0 1px 3px rgba(0,0,0,.7);opacity:0;transition:opacity .6s}
+#hint.show{opacity:1}
+
+/* Dialog unten */
+#dlg{position:absolute;left:calc(12px + var(--safe-l));right:calc(12px + var(--safe-r));bottom:calc(16px + var(--safe-b));
+  background:var(--paper);border-radius:20px;padding:14px 16px 12px;box-shadow:0 8px 30px rgba(0,0,0,.45);display:none;pointer-events:auto;
+  max-width:560px;margin:0 auto}
+#dlg.show{display:block;animation:pop .25s ease-out}
+@keyframes pop{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+#who{font-weight:900;font-size:13px;letter-spacing:.3px;text-transform:uppercase;color:var(--accent);margin-bottom:4px;display:flex;align-items:center;gap:8px}
+#who .dot{width:14px;height:14px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 3px rgba(0,0,0,.06)}
+#txt{font-size:17px;line-height:1.45;min-height:48px;font-weight:600}
+#next{margin-top:6px;text-align:right;font-size:12px;font-weight:800;color:#8a7a5a;opacity:.9}
+
+/* Erzählkarten */
+.overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:rgba(5,20,40,.55);
+  backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);padding:18px;z-index:10;pointer-events:auto}
+.overlay.show{display:flex}
+.card{background:var(--paper);border-radius:26px;padding:24px 22px 18px;max-width:420px;width:100%;box-shadow:0 14px 50px rgba(0,0,0,.5);text-align:center}
+.card h1{margin:0 0 4px;font-size:26px;font-weight:900;color:#1f3550;line-height:1.15}
+.card h2{margin:0 0 10px;font-size:13px;font-weight:700;color:#8a7a5a;letter-spacing:.5px;text-transform:uppercase}
+.card p{margin:8px 0 14px;font-size:16px;line-height:1.5;font-weight:500}
+.go{width:100%;border:none;background:var(--accent);color:#fff;font-weight:900;font-size:18px;padding:14px;border-radius:14px;cursor:pointer;
+  box-shadow:0 4px 0 #b8631a;font-family:var(--font)}
+.go:active{transform:translateY(2px);box-shadow:0 2px 0 #b8631a}
+.go.soft{background:#e9e2d0;color:#1f3550;box-shadow:0 4px 0 #bfb59e;margin-top:8px}
+.legend{display:flex;gap:6px;margin-top:12px;font-size:11px;color:#6b7280;font-weight:700}
+.legend span{flex:1;background:#f1ebdc;border-radius:10px;padding:6px 4px}
+.pagenum{font-size:11px;color:#a0937a;margin-top:10px;font-weight:700}
+#cardArt{width:100%;height:120px;border-radius:16px;margin-bottom:8px;display:none}
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+<div id="hud">
+  <div id="map"></div>
+  <div id="bubbles">🫧 0</div>
+  <div id="hint"></div>
+  <div id="dlg"><div id="who"><span class="dot"></span><span id="whoname"></span></div><div id="txt"></div><div id="next">Tippen zum Weiterlesen ▶</div></div>
+</div>
+
+<div class="overlay show" id="start">
+  <div class="card">
+    <h2>Eine Gutenachtgeschichte</h2>
+    <h1>Fidibus und der<br>Weg nach Hause</h1>
+    <p>Tief unten im blauen Meer lebt ein kleiner, aufgeweckter Fisch namens Fidibus. Er hat einen großen Traum: Er will die uralten, weisen Schildkröten kennenlernen.</p>
+    <button class="go" id="go">Geschichte spielen</button>
+    <div class="legend"><span>👆 Finger halten: Fidibus schwimmt dorthin</span><span>🫧 Luftblasen sammeln</span><span>📖 Tippen: weiterlesen</span></div>
+  </div>
+</div>
+
+<div class="overlay" id="cards">
+  <div class="card">
+    <canvas id="cardArt" width="400" height="120"></canvas>
+    <h2 id="cardKicker"></h2>
+    <p id="cardText"></p>
+    <button class="go" id="cardNext">Weiter</button>
+    <div class="pagenum" id="cardPage"></div>
+  </div>
+</div>
+
+<div class="overlay" id="end">
+  <div class="card">
+    <h2>Ende</h2>
+    <h1>Gute Nacht, Fidibus.</h1>
+    <p id="endText">Der kleine Fisch schläft tief und fest in seinem sicheren Riff.</p>
+    <button class="go" id="again">Noch einmal erzählen</button>
+  </div>
+</div>
+
+<script src="game.js"></script>
+</body>
+</html>

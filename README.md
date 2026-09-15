@@ -1,5 +1,11 @@
 # Familien-Retreat 17.8. – 6.9.2026
 
+> **Neu: [Fidibus und der Weg nach Hause](fidibus/)** – das Bilderbuch als Spiel. Man schwimmt
+> als Fidibus den ganzen Weg der Geschichte: vom Riff zum Wal, zum Seestern, durch das dunkle
+> Wasser, zur Qualle, durch das Seegras zur Oma-Schildkröte. Dann suchen Mama und Papa, und zum
+> Schluss geht es zu dritt nach Hause ins Moosbett. Alle Texte stammen aus dem Buch.
+> Adresse: `https://dadane87.github.io/PlannDaShit/fidibus/` · Finger halten = schwimmen, tippen = weiterlesen.
+
 > **Neu: [Das Treppenhaus](treppenhaus/)** – ein Spiel für die Kinder. Das große Duplo-Haus
 > (Treppe, Turm, Garten, Torbogen) ist in 3D nachgebaut. Man läuft mit Ben, Mia oder Leo
 > hindurch, klettert die Treppen hoch und sucht acht versteckte Sachen, während Peppa, Papa Wutz,
