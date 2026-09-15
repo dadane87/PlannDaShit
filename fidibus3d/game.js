@@ -479,7 +479,7 @@ const fidM = makeBookFish('fid', fidPoses), mamaM = makeBookFish('mama', parentP
 const FIGS = window.FIG.build(IMG);
 const bookPose = (k, extra) => ({ src: FIGS[k].c, w: BOOK_SPR_BIG[k], eyes: FIGS[k].eyes, ...extra });
 const whaleM = makeBookFigure('whale', { whale: bookPose('whale', { tail: 'right', fat: 0.5 }) });
-const turtleM = makeBookFigure('turtle', { turtle: bookPose('turtle', { fat: 0.5 }), hug: bookPose('hug', { fat: 0.5 }) });
+const turtleM = makeBookFigure('turtle', { turtle: bookPose('turtle', { fat: 0.5 }) });
 const starM = makeBookFigure('star', { star: bookPose('star', { fat: 0.35 }) });
 const jellyM = makeBookFigure('jelly', { jelly: bookPose('jelly', { fat: 0.55, alphaMin: 90, res: 300 }) });
 const jellyLight = new THREE.PointLight(0xd9a6ff, 2.2, 14, 1.6); jellyLight.position.set(0, 1.5, 0.8); jellyM.add(jellyLight);
@@ -510,7 +510,13 @@ function render3d(dt) {
   const hug = G.turtle.hug;
   const line = G.mode === 'dialog' ? G.dialogQueue[G.dialogIdx] : null; const typing = !!(line && G.typed < line.text.length);
   const speaks = who => typing && line.who === who;
-  animBook(turtleM, t, { pose: hug > 0.5 ? 'hug' : 'turtle', lids: hug > 0.5 ? 0 : (blink(5.6, 3.3) > 0 ? 1 : 0), tilt: Math.sin(t * 0.8) * 0.01 });
+  // Umarmung: Fidibus schmiegt sich mit geschlossenen Augen an die Wange der Schildkröte, die Oma schließt die Augen
+  animBook(turtleM, t, { pose: 'turtle', lids: hug > 0.5 || blink(5.6, 3.3) > 0 ? 1 : 0, tilt: Math.sin(t * 0.8) * 0.01, pulse: hug > 0.5 ? Math.sin(t * 1.4) * 0.006 : 0 });
+  if (hug > 0.5) {
+    fidM.visible = true; const k = Math.min(1, (hug - 0.5) * 4);
+    fidM.position.set(turtleM.position.x - 4.7 + (1 - k) * 0.6, turtleM.position.y + 0.45 + Math.sin(t * 1.4) * 0.06, 0.6);
+    fidM.rotation.set(0, Math.PI, 0.38); animBookFish(fidM, t, { moving: false, speed: 0, mood: 'happy', talking: false, blink: 1 });
+  }
   animBook(whaleM, t, { pose: 'whale', lids: blink(4.7, 1.3) > 0 ? 1 : 0, wag: Math.sin(t * 1.4) * 0.14, tilt: Math.sin(t * 0.6) * 0.015 });
   const jp = Math.sin(t * 1.6); animBook(jellyM, t, { pose: 'jelly', lids: blink(5.1, 2.2) > 0 ? 1 : 0, pulse: jp * 0.03, tilt: Math.sin(t * 0.8) * 0.04 });
   jellyLight.intensity = 1.8 + jp * 0.5;

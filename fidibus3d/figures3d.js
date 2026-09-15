@@ -408,10 +408,17 @@ function inflate(src, worldW, opts = {}) {
     if (on === lidState) return; lidState = on;
     g.clearRect(0, 0, cw, ch); g.drawImage(base, 0, 0);
     if (on && opts.eyes) for (const e of opts.eyes) {
-      const ex = e.cx + pad, ey = e.cy + pad;
-      g.fillStyle = e.col; g.beginPath(); g.ellipse(ex, ey, e.rx, e.ry, 0, 0, 7); g.fill();
-      g.strokeStyle = 'rgba(50,25,10,.5)'; g.lineWidth = Math.max(1.2, e.rx * 0.12); g.lineCap = 'round';
-      g.beginPath(); g.ellipse(ex, ey + e.ry * 0.1, e.rx * 0.8, e.ry * 0.45, 0, 0.2, Math.PI - 0.2); g.stroke();
+      const ex = e.cx + pad, ey = e.cy + pad, rx = e.rx * 1.04, ry = e.ry * 1.04;
+      // Lid aus der Haut über dem Auge (Bild nach unten verschoben einzeichnen), leicht gewölbt schattiert
+      g.save(); g.beginPath(); g.ellipse(ex, ey, rx, ry, 0, 0, 7); g.clip();
+      g.drawImage(base, 0, ry * 1.6);
+      const sh = g.createLinearGradient(0, ey - ry, 0, ey + ry); sh.addColorStop(0, 'rgba(255,235,200,.18)'); sh.addColorStop(0.45, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(70,30,5,.38)');
+      g.fillStyle = sh; g.fillRect(ex - rx, ey - ry, 2 * rx, 2 * ry); g.restore();
+      // geschlossene, zufrieden gebogene Augenlinie mit weichem Schatten
+      for (const [w, col, dy] of [[0.22, 'rgba(70,30,5,.28)', 0.06], [0.11, 'rgba(45,20,8,.85)', 0]]) {
+        g.strokeStyle = col; g.lineWidth = Math.max(1.2, rx * w); g.lineCap = 'round'; g.beginPath();
+        g.moveTo(ex - rx * 0.78, ey + ry * (0.05 + dy)); g.quadraticCurveTo(ex, ey + ry * (0.62 + dy), ex + rx * 0.78, ey + ry * (0.05 + dy)); g.stroke();
+      }
     }
     tex.needsUpdate = true;
   };
