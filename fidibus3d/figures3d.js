@@ -333,11 +333,11 @@ function bleed(img, passes, harden = 0, alphaMin = 190) {
 function inflate(src, worldW, opts = {}) {
   const iw = src.width, ih = src.height, step = Math.max(1, Math.round(Math.max(iw, ih) / (opts.res || 130)));
   const cols = Math.ceil(iw / step) + 3, rows = Math.ceil(ih / step) + 3;
-  // Quellbild mit transparentem Rand (pad), darin geblutete Farben und nach außen gehärtetes Alpha:
-  // Die Netzkante liegt dann in opaker Textur (kein transparentes Band an der Kante, auch wenn das Bild den Rand berührt)
+  // Quellbild mit transparentem Rand (pad), darin geblutete Farben und um 3 px nach außen gehärtetes Alpha:
+  // Die auf die Kontur geschobenen Randknoten liegen in opaker Textur, alles weiter außen schneidet der Alpha-Test sauber ab
   const pad = step * 2 + 4, cw = iw + 2 * pad, ch = ih + 2 * pad;
   const base = document.createElement('canvas'); base.width = cw; base.height = ch; const bg = base.getContext('2d'); bg.drawImage(src, pad, pad);
-  const idata = bg.getImageData(0, 0, cw, ch); const A0 = new Uint8ClampedArray(idata.data); bleed(idata, step + 6, step + 2, opts.alphaMin ?? 190); bg.putImageData(idata, 0, 0);
+  const idata = bg.getImageData(0, 0, cw, ch); const A0 = new Uint8ClampedArray(idata.data); bleed(idata, step + 6, 3, opts.alphaMin ?? 190); bg.putImageData(idata, 0, 0);
   const c = document.createElement('canvas'); c.width = cw; c.height = ch; const g = c.getContext('2d'); g.drawImage(base, 0, 0);
   const PX = q => (q - 1) * step, PY = r => (r - 1) * step;
   // innen = Original-Pixel in unmittelbarer Nähe des Knotens ist opak (Textur ist um step+2 px gehärtet, Randknoten liegen also in opaker Textur)
@@ -362,9 +362,12 @@ function inflate(src, worldW, opts = {}) {
   for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { const i = r * cols + q; if (!ins[i]) continue; D[i] = Math.min(D[i], at(r - 1, q) + 1, at(r, q - 1) + 1, at(r - 1, q - 1) + 1.414, at(r - 1, q + 1) + 1.414); }
   for (let r = rows - 1; r >= 0; r--) for (let q = cols - 1; q >= 0; q--) { const i = r * cols + q; if (!ins[i]) continue; D[i] = Math.min(D[i], at(r + 1, q) + 1, at(r, q + 1) + 1, at(r + 1, q + 1) + 1.414, at(r + 1, q - 1) + 1.414); }
   let dmax = 0; for (let i = 0; i < D.length; i++) if (D[i] < INF) dmax = Math.max(dmax, D[i]);
-  const cap = dmax * (opts.cap ?? 0.92), k = worldW / iw, Tz = cap * step * k * (opts.fat ?? 0.85);
+  const TW = (typeof window !== 'undefined' && window.BOOK_TWEAK) || {};
+  const cap = dmax * (opts.cap ?? 0.92), k = worldW / iw, Tz = cap * step * k * (opts.fat ?? TW.fat ?? 0.55), PP = opts.p ?? TW.p ?? 3;
   // Kugelprofil, aber der erste Knoten innen springt nur halb so hoch: dünne Flossen bleiben flach, die Kante wird weicher
-  const zOf = d => { const n = Math.max(0, Math.min(d, cap) - 0.6) / cap; return Tz * Math.sqrt(Math.max(0, 1 - (1 - n) * (1 - n))); };
+  // Superellipsen-Profil: PP = 2 Kugel, größer = flachere Fläche mit runder Kante (Bild bleibt in der Mitte unverzerrt)
+  // Dünne Teile (Flossen) bleiben flach: Die Dicke darf höchstens das 1,1-fache des Randabstands betragen (runde Kante mit ~50°)
+  const zOf = d => { const n = Math.max(0, Math.min(d, cap) - 0.6) / cap; return Math.min(Tz * Math.pow(Math.max(0, 1 - Math.pow(1 - n, PP)), 1 / PP), Math.max(0, d - 0.3) * step * k * 1.1); };
   // Schwanzansatz: schmalste Stelle zwischen dem breitesten Körperteil und der Schwanzflosse
   let split = -1;
   if (opts.tail) {
@@ -375,7 +378,9 @@ function inflate(src, worldW, opts = {}) {
     if (split > 0 && best > ext[qMax] * 0.6) split = -1;
   }
   const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = 4;
-  const mat = new THREE.MeshStandardMaterial({ map: tex, alphaTest: 0.5, roughness: 0.9, metalness: 0, side: THREE.FrontSide, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: 0.32 });
+  // Die Malerei bringt ihre eigene Schattierung mit: überwiegend selbstleuchtend, das 3D-Licht formt nur noch leicht nach
+  const lit = TW.col ?? 0.5;
+  const mat = new THREE.MeshStandardMaterial({ map: tex, color: new THREE.Color(lit, lit, lit), alphaTest: 0.5, roughness: 0.95, metalness: 0, side: THREE.FrontSide, emissive: 0xffffff, emissiveMap: tex, emissiveIntensity: TW.em ?? 0.7 });
   const wx = i => (nx[i] - iw / 2) * k, wy = i => (ih / 2 - ny[i]) * k;
   function build(qFrom, qTo, x0) {
     const pos = [], uv = [], idx = []; const id = new Int32Array(cols * rows).fill(-1); let n = 0;
@@ -419,7 +424,7 @@ function inflate(src, worldW, opts = {}) {
 export function makeBookFigure(kind, poses) {
   const g = new THREE.Group(); const P = {};
   for (const key in poses) {
-    const p = poses[key]; const inf = inflate(p.src, p.w * BOOK_K, { tail: p.tail, eyes: p.eyes, fat: p.fat ?? 0.85, alphaMin: p.alphaMin, res: p.res });
+    const p = poses[key]; const inf = inflate(p.src, p.w * BOOK_K, { tail: p.tail, eyes: p.eyes, fat: p.fat, p: p.p, alphaMin: p.alphaMin, res: p.res });
     inf.group.rotation.y = p.flip ? Math.PI : 0; inf.group.visible = false; g.add(inf.group); P[key] = inf;
   }
   g.userData.book = { poses: P, kind, current: null };
@@ -439,7 +444,7 @@ export function animBook(g, t, o) {
 // Fische: Posen aus Version-1-Sprites { src, face, w, eyes }
 export function makeBookFish(kind, poses) {
   const spec = {};
-  for (const key in poses) { const p = poses[key]; const front = key === 'fid_front'; spec[key] = { src: p.src, w: p.w, eyes: p.eyes, tail: front ? null : (p.face < 0 ? 'right' : 'left'), flip: p.face > 0, fat: front ? 0.6 : 0.85 }; }
+  for (const key in poses) { const p = poses[key]; const front = key === 'fid_front'; spec[key] = { src: p.src, w: p.w, eyes: p.eyes, tail: front ? null : (p.face < 0 ? 'right' : 'left'), flip: p.face > 0, fat: front ? 0.45 : undefined }; }
   return makeBookFigure(kind, spec);
 }
 export function animBookFish(g, t, o) {
@@ -448,6 +453,6 @@ export function animBookFish(g, t, o) {
     key = o.mood === 'sleep' ? 'fid_sleep' : o.mood === 'sad' ? 'fid_sad' : o.mood === 'worried' ? 'fid_worried' : o.mood === 'front' ? 'fid_front' : 'fid_happy';
     if (o.talking && (o.mood === 'happy' || o.mood === 'front') && Math.floor(t * 7) % 2 === 0 && B.poses.fid_talk) key = 'fid_talk';
   }
-  const sp = o.speed || 0, wag = Math.sin(t * (6 + sp * 1.5)) * (o.moving ? 0.45 : 0.16);
+  const sp = o.speed || 0, wag = Math.sin(t * (6 + sp * 1.5)) * (o.moving ? 0.3 : 0.12);
   animBook(g, t, { pose: key, lids: o.mood === 'sleep' || (o.blink || 0) > 0 ? 1 : 0, wag, tilt: o.talking ? Math.sin(t * 13) * 0.025 : 0, pulse: Math.sin(t * 1.8) * 0.015 });
 }

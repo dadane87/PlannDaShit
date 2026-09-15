@@ -68,8 +68,8 @@ const G = {
   mode: 'title', t: 0, step: -1, stepData: null,
   cam: { x: HOME.x, y: 900 },
   fid: { x: HOME.x, y: HOME.y, vx: 0, vy: 0, dir: 1, tilt: 0, fin: 0, eyes: 'open', mood: 'happy', scale: 1, hidden: false },
-  mama: { x: HOME.x - 150, y: HOME.y + 40, vx: 0, vy: 0, dir: 1, tilt: 0, fin: 0, eyes: 'closed', mood: 'sleep', hidden: false },
-  papa: { x: HOME.x + 150, y: HOME.y + 50, vx: 0, vy: 0, dir: -1, tilt: 0, fin: 0, eyes: 'closed', mood: 'sleep', hidden: false },
+  mama: { x: HOME.x - 150, y: HOME.y - 20, vx: 0, vy: 0, dir: 1, tilt: 0, fin: 0, eyes: 'closed', mood: 'sleep', hidden: false },
+  papa: { x: HOME.x + 170, y: HOME.y + 50, vx: 0, vy: 0, dir: -1, tilt: 0, fin: 0, eyes: 'closed', mood: 'sleep', hidden: false },
   ctrl: null,             // welches Wesen gesteuert wird
   target: null, keys: {}, bubbles: 0, mut: 1, dark: 0, moon: 0, night: 0,
   collect: [], particles: [], hearts: [], trail: [],
@@ -249,8 +249,8 @@ $('again').addEventListener('click', () => { $('end').classList.remove('show'); 
 function startStory() {
   G.step = -1; G.bubbles = 0; G.mut = 1; G.dark = 0; G.moon = 0; G.night = 0; G.stationsDone = new Set(); G.current = 'home';
   Object.assign(G.fid, { x: HOME.x, y: HOME.y, vx: 0, vy: 0, dir: 1, eyes: 'open', mood: 'happy', hidden: false, scale: 1 });
-  Object.assign(G.mama, { x: HOME.x - 150, y: HOME.y + 40, vx: 0, vy: 0, dir: 1, eyes: 'closed', mood: 'sleep', hidden: false });
-  Object.assign(G.papa, { x: HOME.x + 150, y: HOME.y + 50, vx: 0, vy: 0, dir: -1, eyes: 'closed', mood: 'sleep', hidden: false });
+  Object.assign(G.mama, { x: HOME.x - 150, y: HOME.y - 20, vx: 0, vy: 0, dir: 1, eyes: 'closed', mood: 'sleep', hidden: false });
+  Object.assign(G.papa, { x: HOME.x + 170, y: HOME.y + 50, vx: 0, vy: 0, dir: -1, eyes: 'closed', mood: 'sleep', hidden: false });
   G.turtle.hug = 0; G.hearts = []; G.trail = []; G.homeArrived = false; G.blubbed = false; G.particles = []; G.cam.x = HOME.x; G.cam.y = 900;
   makeCollect(); if (window.FB) FB.rebuildCollect(); renderMap(); $('bubbles').textContent = '🫧 0';
   nextStep();
@@ -360,7 +360,7 @@ function update(dt) {
       G.mama.mood = G.papa.mood = 'happy';
     } else if (G.cut === 'night') {
       G.night = smooth(0, 0.5, p); G.moon = smooth(0.1, 0.7, p);
-      follow(G.fid, HOME.x + 10, HOME.y + 20, dt, 2, 250); follow(G.mama, HOME.x - 200, HOME.y - 30, dt, 2, 250); follow(G.papa, HOME.x + 230, HOME.y - 20, dt, 2, 250);
+      follow(G.fid, HOME.x + 10, HOME.y + 20, dt, 2, 250); follow(G.mama, HOME.x - 160, HOME.y - 40, dt, 2, 250); follow(G.papa, HOME.x + 200, HOME.y - 10, dt, 2, 250);
       G.mama.dir = 1; G.papa.dir = -1;
       if (p > 0.6) { G.fid.mood = 'sleep'; G.fid.dir = 1; }
       if (p > 0.85) { G.mama.eyes = G.papa.eyes = 'closed'; G.mama.mood = G.papa.mood = 'sleep'; }
@@ -447,9 +447,9 @@ for (let x = -6; x < 118; x += 5 + r3() * 6) {
 for (let i = 0; i < 150; i++) grassBlade(X(POS.grassFrom) + r3() * X(POS.grassTo - POS.grassFrom), -4 + r3() * 7, 7 + r3() * 4, i % 3 ? 0x1f5a3a : 0x2c7048, 0.14);
 // Felsspalte (Zuhause) mit Moosbett
 {
-  const arch = new THREE.Mesh(new THREE.TorusGeometry(2.6, 1.1, 14, 28, Math.PI), M(0x2f3f5c, { rough: 0.9, flat: true })); arch.position.set(X(HOME.x), Y(1300) + 0.2, -1.2); arch.scale.set(1.3, 1, 1.4); arch.castShadow = true; arch.receiveShadow = true; scene.add(arch);
-  rock(X(HOME.x) - 3.6, Y(1300) + 0.2, -1.5, 1.6); rock(X(HOME.x) + 3.6, Y(1300) + 0.3, -1.4, 1.7); rock(X(HOME.x), Y(1300) + 3.4, -2.4, 2.2);
-  for (let i = -3; i <= 3; i++) { const m = new THREE.Mesh(G_SPH2, M(0x5f9a63, { rough: 0.9 })); m.scale.set(0.5, 0.22, 0.45); m.position.set(X(HOME.x) + i * 0.45, Y(1300) + 0.12, 0.2 + Math.sin(i) * 0.15); m.receiveShadow = true; scene.add(m); }
+  const arch = new THREE.Mesh(new THREE.TorusGeometry(3.5, 1.1, 14, 28, Math.PI), M(0x2f3f5c, { rough: 0.9, flat: true })); arch.position.set(X(HOME.x), Y(1300) + 0.2, -1.2); arch.scale.set(1.3, 1, 1.4); arch.castShadow = true; arch.receiveShadow = true; scene.add(arch);
+  rock(X(HOME.x) - 4.9, Y(1300) + 0.2, -1.5, 1.7); rock(X(HOME.x) + 4.9, Y(1300) + 0.3, -1.4, 1.8); rock(X(HOME.x), Y(1300) + 4.6, -2.6, 2.4);
+  for (let i = -5; i <= 5; i++) { const m = new THREE.Mesh(G_SPH2, M(0x5f9a63, { rough: 0.9 })); m.scale.set(0.5, 0.22, 0.45); m.position.set(X(HOME.x) + i * 0.45, Y(1300) + 0.12, 0.2 + Math.sin(i) * 0.15); m.receiveShadow = true; scene.add(m); }
 }
 // Lichtstrahlen (zarte Flächen) und Plankton
 const rays = new THREE.Group(); scene.add(rays);
@@ -469,6 +469,7 @@ function spriteFrom(kind) { const arr = pool[kind]; const s = arr.find(x => !x.v
 // ───────────── Figuren ─────────────
 // Buchbilder laden (aus Version 1) und Mama/Papa daraus ableiten
 const IMG = {};
+window.BOOK_TWEAK = Object.fromEntries([...new URLSearchParams(location.search)].filter(([k]) => ['fat', 'p', 'em', 'col'].includes(k)).map(([k, v]) => [k, +v]));
 await Promise.all(['fid_happy', 'fid_talk', 'fid_sad', 'fid_worried', 'fid_sleep', 'fid_front'].map(k => new Promise(res => { const im = new Image(); im.onload = res; im.onerror = res; im.src = '../fidibus/img/' + k + '.png'; IMG[k] = im; })));
 const fidPoses = {}; for (const k in IMG) if (IMG[k].width) fidPoses[k] = { src: IMG[k], face: BOOK_SPR[k].face, w: BOOK_SPR[k].w, eyes: BOOK_EYES[k] };
 const parentPose = kind => { const p = window.FIG.parent(IMG.fid_happy, kind); return { [kind]: { src: p.c, face: p.face, w: BOOK_SPR[kind].w, eyes: p.eyes } }; };
@@ -477,10 +478,10 @@ const fidM = makeBookFish('fid', fidPoses), mamaM = makeBookFish('mama', parentP
 // Wal, Schildkröte (mit Umarmung), Seestern und Qualle: die gemalten Figuren aus Version 1, ebenfalls aufgeblasen
 const FIGS = window.FIG.build(IMG);
 const bookPose = (k, extra) => ({ src: FIGS[k].c, w: BOOK_SPR_BIG[k], eyes: FIGS[k].eyes, ...extra });
-const whaleM = makeBookFigure('whale', { whale: bookPose('whale', { tail: 'right', fat: 0.6 }) });
-const turtleM = makeBookFigure('turtle', { turtle: bookPose('turtle', { fat: 0.55 }), hug: bookPose('hug', { fat: 0.55 }) });
-const starM = makeBookFigure('star', { star: bookPose('star', { fat: 0.45 }) });
-const jellyM = makeBookFigure('jelly', { jelly: bookPose('jelly', { fat: 0.7, alphaMin: 90, res: 300 }) });
+const whaleM = makeBookFigure('whale', { whale: bookPose('whale', { tail: 'right', fat: 0.5 }) });
+const turtleM = makeBookFigure('turtle', { turtle: bookPose('turtle', { fat: 0.5 }), hug: bookPose('hug', { fat: 0.5 }) });
+const starM = makeBookFigure('star', { star: bookPose('star', { fat: 0.35 }) });
+const jellyM = makeBookFigure('jelly', { jelly: bookPose('jelly', { fat: 0.55, alphaMin: 90, res: 300 }) });
 const jellyLight = new THREE.PointLight(0xd9a6ff, 2.2, 14, 1.6); jellyLight.position.set(0, 1.5, 0.8); jellyM.add(jellyLight);
 scene.add(fidM, mamaM, papaM, whaleM, starM, jellyM, turtleM);
 const WHALE_Y = Y(660), JELLY_Y = Y(948) + 1.4;
@@ -494,7 +495,7 @@ const blink = (period, off) => { const ph = (G.t + off) % period; return ph < 0.
 
 function syncFish(m, f, kind, off) {
   m.visible = !f.hidden;
-  m.position.set(X(f.x), Y(f.y) + Math.sin(f.fin * 0.9) * 0.03, kind === 'mama' ? -0.6 : kind === 'papa' ? 0.3 : 0);
+  m.position.set(X(f.x), Y(f.y) + Math.sin(f.fin * 0.9) * 0.03, kind === 'mama' ? -0.5 : kind === 'papa' ? 0.25 : 0);
   const front = f.mood === 'front';
   const yaw = front ? 0 : (f.dir > 0 ? Math.PI : 0);
   m.rotation.set(0, yaw, (f.dir > 0 ? 1 : -1) * -f.tilt * 0.8 * (front ? 0 : 1));
@@ -537,7 +538,7 @@ function render3d(dt) {
   // Kamera: schräg von vorn, folgt dem 2D-Kamerapunkt
   const dist = (H > W ? 15 : 11.5) / zoom;
   const lx = X(G.cam.x), ly = Y(G.cam.y) + 0.4;
-  camera.position.set(lx + 1.6, ly + 2.2 + dist * 0.12, dist);
+  camera.position.set(lx + dist * 0.11, ly + 2.2 + dist * 0.12, dist);
   camera.lookAt(lx, ly, 0);
   sun.position.set(lx + 6, 26, 14); sun.target.position.set(lx, Y(1300), 0);
   renderer.render(scene, camera);
