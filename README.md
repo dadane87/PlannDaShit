@@ -1,3 +1,15 @@
+> **Neu: [Health-Rückblick](gesundheit/)**: die eigenen Apple-Health-Daten als iPhone-App ausgewertet.
+> **Übersicht** (Kennzahlen wie Ø Schritte, Distanz, Tage ≥ 10.000, längste Serie, Aktivkalorien, Trainingsminuten,
+> Ruhepuls, HRV, Schlafdauer und -zeit, Stockwerke, Aktivitätsringe, VO₂max, Gewicht, jeweils mit Vergleich zum Vorjahr,
+> dazu ein Schritte-Kalender und Bestwerte), **Trends** (Schritte pro Monat und Wochentag, Ruhepuls, HRV, Schlafdauer,
+> Schlaffenster, Schlafphasen, VO₂max, Gewicht), **Workouts** (Sportarten, Monate, Tageszeit, Rekorde) und
+> **Rückblick**: das Jahr als Story mit Vollbild-Folien zum Durchtippen. Am Ende stehen der eigene „Health-Typ“ und ein
+> Bild zum Teilen.
+> Daten: Health-App → Profilbild → *Alle Gesundheitsdaten exportieren* → in „Dateien“ sichern → in der App
+> *Export einlesen* und `Export.zip` wählen. Die Datei wird **nur lokal im Browser** gelesen (gestreamt, auch bei
+> mehreren GB) und nie hochgeladen; gespeichert werden nur Tageswerte auf dem Gerät. Ohne Export: *Mit Beispieldaten ausprobieren*.
+> Adresse: `https://dadane87.github.io/PlannDaShit/gesundheit/`
+
 # Familien-Retreat 17.8. – 6.9.2026
 
 > **Neu: [Gemeinde Ottenhofen](ottenhofen/)** – die Seite www.vg-oberneuching.de/ottenhofen-54
