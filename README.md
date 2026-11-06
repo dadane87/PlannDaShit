@@ -1,5 +1,15 @@
 # Familien-Retreat 17.8. – 6.9.2026
 
+> **Neu: [Gemeinde Ottenhofen](ottenhofen/)** – die Seite www.vg-oberneuching.de/ottenhofen-54
+> mit allen Unterseiten als iPhone-App im iOS-Stil (Tab-Leiste, große Titel, Zurück-Wischen, Dark Mode).
+> Tabs: **Start** (Eilmeldung, Bürgermeister, aktuelle Meldungen, nächste Termine, Online-Services),
+> **Termine** (Kalender mit Ottenhofen/Neuching), **Infos A–Z** (alle Artikel mit Buchstaben-Leiste und Suche),
+> **Gemeinde** (Bücherei, Geschichte, Gemeinderat, Gewerbe, Kitas, Schule, Vereine, Ver-/Entsorgung, Impressum,
+> Datenschutz) und **Dokumente** (alle 271 PDFs/DOCs durchsuchbar, nach Art sortiert, antippen öffnet die Datei).
+> Telefonnummern sind antippbar, Dokumente öffnen direkt von der Gemeinde-Website.
+> Adresse: `https://dadane87.github.io/PlannDaShit/ottenhofen/` · Inhalte neu holen:
+> `python3 ottenhofen/aktualisieren.py` (schreibt `ottenhofen/daten.js`).
+
 > **Neu: [Fidibus 3D (Version 2)](fidibus3d/)** – dieselbe Geschichte als echtes 3D-Spiel (three.js):
 > alle Figuren als 3D-Modelle mit Licht, Schatten, Nebel und einer Kamera, die schräg mitfährt.
 > Adresse: `https://dadane87.github.io/PlannDaShit/fidibus3d/` · Steuerung wie in Version 1.
