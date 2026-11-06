@@ -2,8 +2,10 @@
 > **Übersicht** (Kennzahlen wie Ø Schritte, Distanz, Tage ≥ 10.000, längste Serie, Aktivkalorien, Trainingsminuten,
 > Ruhepuls, HRV, Schlafdauer und -zeit, Stockwerke, Aktivitätsringe, VO₂max, Gewicht, jeweils mit Vergleich zum Vorjahr,
 > dazu ein Schritte-Kalender und Bestwerte), **Trends** (Schritte pro Monat und Wochentag, Ruhepuls, HRV, Schlafdauer,
-> Schlaffenster, Schlafphasen, VO₂max, Gewicht), **Workouts** (Sportarten, Monate, Tageszeit, Rekorde) und
-> **Rückblick**: das Jahr als Story mit Vollbild-Folien zum Durchtippen. Am Ende stehen der eigene „Health-Typ“ und ein
+> Schlaffenster, Schlafphasen, VO₂max, Gewicht), **Workouts** (Sportarten, Monate, Tageszeit, Rekorde),
+> **Jahre** (Langzeit-Blick: Entwicklung vom ersten zum letzten Jahr, Jahre im Vergleich, Lieblingssport je Jahr,
+> Ruhepuls/HRV/VO₂max/Schlaf/Gewicht über alle Jahre, Jahrestabelle, Rekorde aller Zeiten) und
+> **Rückblick**: jedes Jahr und alle Jahre zusammen als Story mit Vollbild-Folien zum Durchtippen. Am Ende stehen der eigene „Health-Typ“ und ein
 > Bild zum Teilen.
 > Daten: Health-App → Profilbild → *Alle Gesundheitsdaten exportieren* → in „Dateien“ sichern → in der App
 > *Export einlesen* und `Export.zip` wählen. Die Datei wird **nur lokal im Browser** gelesen (gestreamt, auch bei

@@ -54,6 +54,25 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;paddin
 .demo-note{font-size:14px;color:var(--text-2);margin:-4px 4px 12px}
 .demo-note button{color:var(--tint);font-weight:600;font-size:14px}
 
+/* Navigationsleiste oben */
+.navbar{display:flex;justify-content:space-between;align-items:center;min-height:30px;margin:0 -2px -14px;padding-top:4px}
+.navbar button{color:var(--tint);font-size:17px;padding:4px 2px}
+
+/* Jahre */
+.foot{font-size:12.5px;color:var(--text-2);margin:8px 0 0}
+.ok{color:var(--text-2);font-weight:700}
+.list .yr{font-weight:700;font-variant-numeric:tabular-nums;margin-right:6px}
+.tbl-wrap{overflow-x:auto;margin:8px -14px 0;padding:0 14px;-webkit-overflow-scrolling:touch}
+.ytbl{border-collapse:separate;border-spacing:0;font-size:14px;font-variant-numeric:tabular-nums;min-width:100%}
+.ytbl th,.ytbl td{padding:8px 10px;text-align:right;white-space:nowrap;border-top:.5px solid var(--sep)}
+.ytbl thead th{border-top:0;font-size:13px;color:var(--text-2);font-weight:600}
+.ytbl thead th:first-child{position:sticky;left:-14px;z-index:1;background:var(--card)}
+.ytbl tbody th{position:sticky;left:-14px;background:var(--card);text-align:left;font-weight:500;padding-left:14px;color:var(--text-2);font-size:13px}
+.ytbl td.best{font-weight:700}
+.sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px}
+.story-cta.all{background:linear-gradient(120deg,#302b63,#ff0080);box-shadow:0 8px 24px rgba(255,0,128,.22)}
+.story-card.wide{grid-column:1/-1;width:100%;aspect-ratio:auto;min-height:170px;margin-bottom:12px;gap:6px}
+
 /* Kacheln */
 .tiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:18px}
 @media (min-width:600px){.tiles{grid-template-columns:repeat(3,minmax(0,1fr))}}
@@ -203,6 +222,16 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;paddin
 .s-actions{display:flex;flex-direction:column;gap:10px;margin-top:30px}
 .s-actions button{padding:15px;border-radius:999px;font-weight:700;font-size:17px;background:#fff;color:#3a0b6b}
 .s-actions .s-again{background:rgba(255,255,255,.18);color:#fff}
+
+.s-bars.years .mb em{font-style:normal;font-size:12px;font-weight:700;opacity:0;white-space:nowrap}
+.play .s-bars.years .mb em{animation:up .5s forwards;animation-delay:calc(1.2s + var(--d,0s))}
+.s-bars.years{height:170px}
+.s-evo{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0 22px}
+.s-evo.n4{grid-template-columns:repeat(4,minmax(0,1fr))}
+.s-evo div{display:flex;flex-direction:column;align-items:center;gap:2px;background:rgba(255,255,255,.14);border-radius:14px;padding:10px 4px}
+.s-evo .e{font-size:34px;line-height:1.1}
+.s-evo .y{font:800 15px var(--font-d)}
+.s-evo .n{font-size:11.5px;opacity:.85;text-align:center;line-height:1.2}
 
 /* Einblend-Animationen */
 .slide [class*=" a"],.slide [class^="a"]{opacity:0}

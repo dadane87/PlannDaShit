@@ -220,6 +220,204 @@ function storySlides(data, p) {
   return slides;
 }
 
+/* ── Story über alle Jahre ──────────────────────────────────────────────────── */
+function storySlidesAll(data) {
+  const years = yearList(data);
+  const P = allPeriod(data), all = compute(data, P.from, P.to);
+  const slides = [];
+  const num = (v, dec = 0) => `<span class="cnt" data-to="${v}" data-dec="${dec}">${dec ? fmt1(0) : 0}</span>`;
+  const yb = (list, f, top, fmtv) => {
+    const max = Math.max(...list.map((Y) => f(Y) || 0)) || 1;
+    return `<div class="s-bars years">${list.map((Y, i) => `<div class="mb${Y === top ? ' top' : ''}" style="--d:${(i * 0.08).toFixed(2)}s"><em>${fmtv ? fmtv(f(Y)) : ''}</em><i style="--h:${((f(Y) || 0) / max * 100).toFixed(1)}%"></i><span>’${String(Y.y).slice(2)}${Y.partial ? '*' : ''}</span></div>`).join('')}</div>`;
+  };
+  const full = years.filter((Y) => !Y.partial);
+  const firstY = years[0], lastY = years[years.length - 1];
+
+  // 1 · Intro
+  slides.push({
+    bg: 'linear-gradient(160deg,#0f0c29 0%,#302b63 50%,#ff0080 130%)', deco: 'stars',
+    html: `<div class="s-top a1">Deine Health-Geschichte</div>
+      <div class="s-big a2">${firstY.y} –<br>${lastY.y}</div>
+      <div class="s-h a3">${years.length} Jahre. ${fmt(all.nDays)} Tage. Ein Körper, der dich überall hingetragen hat.</div>
+      <div class="s-small a4">Tippe rechts, um durch deine Jahre zu reisen.</div>`,
+  });
+
+  // 2 · Lebenszeit-Schritte
+  if (all.steps.total) {
+    const km = all.km || all.steps.total * 0.00075;
+    const cmp = distanceCompare(km);
+    const earth = km / 40075;
+    slides.push({
+      bg: 'linear-gradient(160deg,#f7971e 0%,#ff3d5a 100%)', deco: 'steps',
+      html: `<div class="s-top a1">Seit ${fmtDate(all.keys[0], true)}</div>
+        <div class="s-big a2">${num(Math.round(all.steps.total))}</div>
+        <div class="s-h a3">Schritte. Insgesamt.</div>
+        <div class="s-card a4">Das sind <b>${fmt(km)} km</b>${cmp ? ` – weiter als ${esc(cmp[1])}` : ''}.
+        ${earth >= 0.05 ? `<br>Damit hast du <b>${fmt(earth * 100)} %</b> des Weges um die Erde geschafft. 🌍` : ''}</div>`,
+    });
+  }
+
+  // 3 · Jahr für Jahr
+  const sy = years.filter((Y) => Y.st.steps.n >= 30);
+  if (sy.length >= 2) {
+    const best = sy.reduce((b, Y) => (!b || Y.st.steps.avg > b.st.steps.avg ? Y : b), null);
+    const a = sy[0], b = sy[sy.length - 1];
+    const ch = (b.st.steps.avg / a.st.steps.avg - 1) * 100;
+    slides.push({
+      bg: 'linear-gradient(160deg,#4776e6 0%,#8e54e9 100%)', deco: 'none',
+      html: `<div class="s-top a1">Jahr für Jahr</div>
+        <div class="s-h a2"><b>${best.y}</b> war dein aktivstes Jahr.</div>
+        ${yb(sy, (Y) => Y.st.steps.avg, best, (v) => compact(v))}
+        <div class="s-card a4">Ø <b>${fmt(best.st.steps.avg)}</b> Schritte pro Tag ${best.y === b.y ? '– und das ist das aktuelle Jahr. Stark! 🚀' : 'in ' + best.y + '.'}
+        <br>${Math.abs(ch) < 3 ? `Seit ${a.y} bist du erstaunlich konstant geblieben.` : ch > 0 ? `Heute gehst du <b>${fmt(ch)} % mehr</b> als ${a.y}.` : `Heute sind es ${fmt(-ch)} % weniger als ${a.y}.`}</div>`,
+    });
+  }
+
+  // 4 · Rekorde aller Zeiten
+  if (all.steps.best) {
+    slides.push({
+      bg: 'linear-gradient(160deg,#00c9a7 0%,#0081cf 100%)', deco: 'burst',
+      html: `<div class="s-top a1">Rekord aller Zeiten</div>
+        <div class="s-big a2">${num(all.steps.best[1])}</div>
+        <div class="s-h a3">Schritte am ${WDL[wdOf(all.steps.best[0])]}, ${fmtDate(all.steps.best[0])}.</div>
+        ${all.steps.streak >= 3 ? `<div class="s-card a4">Und deine längste Serie über 10.000 Schritte: <b>${all.steps.streak} Tage</b> am Stück (${fmtDate(all.steps.streakStart)} – ${fmtDate(all.steps.streakEnd)}). 🔥</div>` : ''}`,
+    });
+  }
+
+  // 5 · Workouts über die Jahre
+  const wy = years.filter((Y) => Y.st.nDays >= 30);
+  if (all.workouts.n >= 5 && wy.length >= 2) {
+    const best = wy.reduce((b, Y) => (!b || Y.st.workouts.perWeek > b.st.workouts.perWeek ? Y : b), null);
+    const a = wy[0], b = wy[wy.length - 1];
+    const ratio = a.st.workouts.perWeek > 0 ? b.st.workouts.perWeek / a.st.workouts.perWeek : null;
+    slides.push({
+      bg: 'linear-gradient(160deg,#11998e 0%,#38ef7d 100%)', deco: 'none',
+      html: `<div class="s-top a1">Training</div>
+        <div class="s-h a2"><b>${num(all.workouts.n)}</b> Workouts, <b>${num(Math.round(all.workouts.min / 60))}</b> Stunden</div>
+        ${yb(wy, (Y) => Y.st.workouts.n, best, (v) => fmt(v))}
+        <div class="s-card a4">${ratio && ratio >= 1.25 ? `Heute trainierst du <b>${fmt1(ratio)}-mal so oft</b> wie ${a.y}: ${fmt1(b.st.workouts.perWeek)} statt ${fmt1(a.st.workouts.perWeek)} Einheiten pro Woche. 💪`
+          : `Im besten Jahr (${best.y}) waren es <b>${fmt1(best.st.workouts.perWeek)}</b> Workouts pro Woche.`}</div>`,
+    });
+  }
+
+  // 6 · Top-Sportarten aller Zeiten
+  if (all.workouts.types.length) {
+    const list = all.workouts.types.slice(0, 5).map((t, i) => `<li class="a${Math.min(5, i + 3)}"><b>${i + 1}</b><span class="em">${sportIcon(t.t)}</span><span class="nm">${esc(sportName(t.t))}<small>${fmt(t.n)}× · ${fmt(t.min / 60)} h${t.km ? ' · ' + fmt(t.km) + ' km' : ''}</small></span></li>`).join('');
+    slides.push({
+      bg: 'linear-gradient(160deg,#fc466b 0%,#3f5efb 100%)', deco: 'burst',
+      html: `<div class="s-top a1">Deine Top-Sportarten</div><div class="s-h a2">aller Zeiten</div><ol class="s-rank">${list}</ol>`,
+    });
+  }
+
+  // 7 · Wandel der Lieblingssportart
+  const tops = years.filter((Y) => Y.st.workouts.types[0]).map((Y) => ({ Y, t: Y.st.workouts.types[0].t }));
+  if (tops.length >= 2) {
+    const changed = tops[0].t !== tops[tops.length - 1].t;
+    slides.push({
+      bg: 'linear-gradient(160deg,#f12711 0%,#f5af19 100%)', deco: 'steps',
+      html: `<div class="s-top a1">So hat sich dein Sport verändert</div>
+        <div class="s-evo a2${tops.length === 4 || tops.length > 6 ? ' n4' : ''}">${tops.map((x) => `<div><span class="e">${sportIcon(x.t)}</span><span class="y">${x.Y.y}</span><span class="n">${esc(sportName(x.t))}</span></div>`).join('')}</div>
+        <div class="s-h a3">${changed ? `Vom ${esc(sportName(tops[0].t))} zum ${esc(sportName(tops[tops.length - 1].t))}.` : `${esc(sportName(tops[0].t))} – Jahr für Jahr deine Nummer 1.`}</div>
+        <div class="s-card a4">${changed ? 'Neue Leidenschaft gefunden? Sieht ganz so aus. ✨' : 'Treue zahlt sich aus: Du bist dir die ganze Zeit treu geblieben. 🫶'}</div>`,
+    });
+  }
+
+  // 8 · Herz über die Jahre
+  const hy = years.filter((Y) => Y.st.heart.rhrSeries.length >= 30);
+  if (hy.length >= 2) {
+    const a = hy[0], b = hy[hy.length - 1];
+    const d = b.st.heart.rhr - a.st.heart.rhr;
+    const low = hy.reduce((m, Y) => (!m || Y.st.heart.rhr < m.st.heart.rhr ? Y : m), null);
+    const hv = years.filter((Y) => Y.st.heart.hrvSeries.length >= 30);
+    const hd = hv.length >= 2 ? hv[hv.length - 1].st.heart.hrv - hv[0].st.heart.hrv : null;
+    slides.push({
+      bg: 'linear-gradient(160deg,#e94057 0%,#8a2387 100%)', deco: 'pulse',
+      html: `<div class="s-top a1">Dein Herz über die Jahre</div>
+        ${all.heart.beats ? `<div class="s-h a2">Es hat seit ${firstY.y} rund</div><div class="s-big a2">${num(Math.round(all.heart.beats / 1e6))} Mio.</div><div class="s-h a3">Mal geschlagen.</div>` : ''}
+        ${yb(hy, (Y) => Y.st.heart.rhr, low, (v) => fmt(v))}
+        <div class="s-card a4">Ruhepuls ${a.y}: ${fmt(a.st.heart.rhr)} bpm → ${b.y}: <b>${fmt(b.st.heart.rhr)} bpm</b>.
+        ${d <= -1 ? ` Das sind <b>${fmt(-d)} Schläge pro Minute weniger</b> – dein Herz arbeitet effizienter. 💪` : d >= 1 ? ' Etwas höher als früher – Erholung lohnt sich.' : ' Bemerkenswert stabil.'}
+        ${hd != null && Math.abs(hd) >= 2 ? `<br>HRV: <b>${hd > 0 ? '+' : '−'}${fmt(Math.abs(hd))} ms</b> seit ${hv[0].y}.` : ''}</div>`,
+    });
+  }
+
+  // 9 · Cardiofitness
+  const vy = years.filter((Y) => Y.st.vo2 && Y.st.vo2.series.length >= 3);
+  if (vy.length >= 2) {
+    const v = (Y) => mean(Y.st.vo2.series.slice(-5).map((x) => x[1]));
+    const a = vy[0], b = vy[vy.length - 1], d = v(b) - v(a);
+    if (Math.abs(d) >= 0.5) slides.push({
+      bg: 'linear-gradient(160deg,#ee0979 0%,#ff6a00 100%)', deco: 'rings',
+      html: `<div class="s-top a1">Cardiofitness</div>
+        <div class="s-h a2">Deine VO₂max seit ${a.y}</div>
+        <div class="s-mega a3">${d > 0 ? '+' : '−'}${num(Math.abs(d), 1)}</div>
+        <div class="s-card a4">von ${fmt1(v(a))} auf <b>${fmt1(v(b))} ml/kg·min</b>. ${d > 0 ? 'Fitter als je zuvor? Deine Daten sagen ja. 🫁' : 'Da geht wieder mehr – du weißt ja, wie es geht.'}</div>`,
+    });
+  }
+
+  // 10 · Schlaf über die Jahre
+  const ny = years.filter((Y) => Y.st.sleep.n >= 30);
+  if (ny.length >= 2) {
+    const a = ny[0], b = ny[ny.length - 1];
+    const d = b.st.sleep.avg - a.st.sleep.avg, bd = b.st.sleep.bed - a.st.sleep.bed;
+    const best = ny.reduce((m, Y) => (!m || Y.st.sleep.avg > m.st.sleep.avg ? Y : m), null);
+    const nightsH = all.sleep.avg * all.sleep.n / 60;
+    slides.push({
+      bg: 'linear-gradient(160deg,#141e30 0%,#243b55 60%,#5b4b9a 100%)', deco: 'stars',
+      html: `<div class="s-top a1">Schlaf über die Jahre</div>
+        <div class="s-h a2"><b>${fmt(all.sleep.n)}</b> Nächte, zusammen <b>${fmt(nightsH / 24)} Tage</b> Schlaf.</div>
+        ${yb(ny, (Y) => Y.st.sleep.avg, best, (v) => hm(v).replace(' h ', ':').replace(' min', ''))}
+        <div class="s-card a4">${Math.abs(d) < 5 ? `Deine Schlafdauer ist seit ${a.y} stabil bei rund <b>${hm(b.st.sleep.avg)}</b>.` : `Du schläfst heute <b>${fmt(Math.abs(d))} min ${d > 0 ? 'länger' : 'kürzer'}</b> als ${a.y}.`}
+        ${Math.abs(bd) >= 10 ? `<br>Und du gehst <b>${fmt(Math.abs(bd))} min ${bd < 0 ? 'früher' : 'später'}</b> ins Bett (Ø ${clock(b.st.sleep.bed)} Uhr). ${bd < 0 ? '🌙' : '🦉'}` : ''}</div>`,
+    });
+  }
+
+  // 11 · Höhenmeter
+  if (all.flights >= 300) {
+    const m = all.flights * 3, c = heightCompare(m);
+    slides.push({
+      bg: 'linear-gradient(160deg,#56ab2f 0%,#a8e063 100%)', dark: true, deco: 'mountain',
+      html: `<div class="s-top a1">Hoch hinaus</div>
+        <div class="s-big a2">${num(m)} m</div>
+        <div class="s-h a3">Höhenmeter über Treppen, seit ${firstY.y}.</div>
+        <div class="s-card a4">Das reicht für <b>${m / c[0] < 1.15 ? 'einmal' : fmt1(m / c[0]) + '-mal'} ${esc(c[1])}</b>. 🏔️</div>`,
+    });
+  }
+
+  // 12 · Health-Typ im Wandel
+  const pers = years.filter((Y) => Y.st.nDays >= 30).map((Y) => ({ Y, per: persona(Y.st) }));
+  if (pers.length >= 2) {
+    const now = pers[pers.length - 1].per;
+    slides.push({
+      bg: 'linear-gradient(160deg,#8e2de2 0%,#4a00e0 100%)', deco: 'burst',
+      html: `<div class="s-top a1">Dein Health-Typ im Wandel</div>
+        <div class="s-evo a2${pers.length === 4 || pers.length > 6 ? ' n4' : ''}">${pers.map((x) => `<div><span class="e">${x.per.animal[1]}</span><span class="y">${x.Y.y}</span><span class="n">${esc(x.per.animal[0])}</span></div>`).join('')}</div>
+        <div class="s-h a3">Heute bist du: ${now.animal[1]} <b>${esc(now.animal[0])}</b></div>
+        <div class="s-card a4">${esc(now.animal[2])}</div>`,
+    });
+  }
+
+  // 13 · Zusammenfassung
+  const per = pers.length ? pers[pers.length - 1].per : persona(all);
+  const items = [];
+  if (all.steps.total) items.push(['Schritte', all.steps.total >= 1e6 ? fmt1(all.steps.total / 1e6) + ' Mio.' : fmt(all.steps.total)]);
+  if (all.km) items.push(['Kilometer', fmt(all.km)]);
+  if (all.workouts.n) items.push(['Workouts', fmt(all.workouts.n)]);
+  if (all.workouts.n) items.push(['Trainingszeit', fmt(all.workouts.min / 60) + ' h']);
+  if (sy.length) { const best = sy.reduce((b, Y) => (!b || Y.st.steps.avg > b.st.steps.avg ? Y : b), null); items.push(['Bestes Jahr', String(best.y)]); }
+  if (hy.length >= 2) items.push(['Ruhepuls', `${fmt(hy[0].st.heart.rhr)} → ${fmt(hy[hy.length - 1].st.heart.rhr)}`]);
+  if (all.steps.best) items.push(['Rekordtag', fmt(all.steps.best[1])]);
+  items.push(['Health-Typ', per.animal[1] + ' ' + per.animal[0]]);
+  slides.push({
+    bg: 'linear-gradient(160deg,#0f0c29 0%,#302b63 50%,#ff0080 130%)', deco: 'none',
+    html: `<div class="s-top a1">${esc(P.short)} in Zahlen</div>
+      <div class="s-sum a2">${items.slice(0, 8).map((i) => `<div><span>${esc(i[0])}</span><b>${esc(i[1])}</b></div>`).join('')}</div>
+      <div class="s-actions a3"><button class="s-share">Als Bild teilen</button><button class="s-again">Nochmal ansehen</button></div>`,
+    share: () => shareImage(P.short, items.slice(0, 8), per),
+  });
+  return slides;
+}
+
 function summaryItems(st, per) {
   const items = [];
   if (st.steps.total) items.push(['Schritte', fmt(st.steps.total)]);
@@ -235,7 +433,7 @@ function summaryItems(st, per) {
 
 /* ── Abspielen ────────────────────────────────────────────────────────────────── */
 function openStory(data, p) {
-  const slides = storySlides(data, p);
+  const slides = p.id === 'all' ? storySlidesAll(data) : storySlides(data, p);
   const root = document.createElement('div');
   root.className = 'story';
   root.innerHTML = `<div class="st-bars">${slides.map(() => '<i><b></b></i>').join('')}</div>
