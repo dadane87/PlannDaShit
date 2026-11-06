@@ -105,7 +105,28 @@ function periods(data) {
 }
 
 /* ── Kennzahlen ───────────────────────────────────────────────────────────────── */
+const MEMO = { data: null, map: new Map() };
 function compute(data, from, to) {
+  if (MEMO.data !== data) { MEMO.data = data; MEMO.map.clear(); }
+  const k = from + '|' + to;
+  if (!MEMO.map.has(k)) MEMO.map.set(k, computeRaw(data, from, to));
+  return MEMO.map.get(k);
+}
+
+// Alle Jahre mit Daten (aufsteigend) samt Kennzahlen; partial = Jahr noch nicht vollständig erfasst
+function yearList(data) {
+  return periods(data).filter((p) => p.year).reverse().map((p) => {
+    const st = compute(data, p.from, p.to);
+    const first = st.keys[0];
+    return { p, st, y: p.year, partial: p.to < `${p.year}-12-31` || (first && first > `${p.year}-01-31`) };
+  });
+}
+function allPeriod(data) {
+  const r = dataRange(data);
+  return { id: 'all', from: r[0], to: r[1], short: `${r[0].slice(0, 4)}–${r[1].slice(0, 4)}`, label: 'Alle Jahre', prev: [r[0], r[0]] };
+}
+
+function computeRaw(data, from, to) {
   const D = data.days;
   const keys = Object.keys(D).filter((k) => k >= from && k <= to).sort();
   const vals = (f) => keys.map((k) => [k, f(D[k])]).filter((x) => x[1] != null && x[1] > 0);
@@ -145,9 +166,11 @@ function compute(data, from, to) {
     const ms = mkeys.map((k) => D[k].st).filter((v) => v > 0);
     const sl = mkeys.map((k) => D[k].sl && D[k].sl.a).filter((v) => v > 0);
     const rh = mkeys.map((k) => D[k].rhr).filter((v) => v > 0);
+    const mv = (f) => mean(mkeys.map((k) => D[k][f]).filter((v) => v > 0));
     months.push({
       key: mk, y, m, label: MON[m - 1], steps: mean(ms), stepsTotal: sum(ms),
-      km: sum(mkeys.map((k) => D[k].di || 0)), sleep: mean(sl), rhr: mean(rh),
+      km: sum(mkeys.map((k) => D[k].di || 0)), sleep: mean(sl), rhr: mean(rh), hrv: mv('hrv'), vo2: mv('vo2'), wt: mv('wt'),
+      bed: mean(mkeys.map((k) => D[k].sl && D[k].sl.a > 0 ? D[k].sl.bt : null).filter((v) => v != null)),
       workouts: data.workouts.filter((w) => w.d.startsWith(mk) && w.d >= from && w.d <= to).length,
     });
   }
@@ -369,7 +392,15 @@ function lineChart(o) {
   // Monatsmarken
   const span = (t1 - t0) / 86400000;
   const mstep = span > 400 ? 3 : span > 200 ? 2 : 1;
-  for (let ms = Date.UTC(+o.from.slice(0, 4), +o.from.slice(5, 7) - 1, 1), i = 0; ms <= t1; i++) {
+  if (span > 1000) {
+    const y0 = +o.from.slice(0, 4), y1 = +o.to.slice(0, 4), ystep = y1 - y0 > 8 ? 2 : 1;
+    for (let yy = y0; yy <= y1; yy++) {
+      const k = `${yy}-01-01`;
+      if (dayMs(k) < t0 || (yy - y0) % ystep) continue;
+      s += `<line class="grid" x1="${x(k)}" x2="${x(k)}" y1="${T}" y2="${H - B}"/><text class="ax" x="${x(k) + 3}" y="${H - 7}">${yy}</text>`;
+    }
+  }
+  if (span <= 1000) for (let ms = Date.UTC(+o.from.slice(0, 4), +o.from.slice(5, 7) - 1, 1), i = 0; ms <= t1; i++) {
     const k = keyOf(ms);
     if (ms >= t0 && i % mstep === 0) s += `<text class="ax" x="${x(k)}" y="${H - 7}" text-anchor="middle">${MON[+k.slice(5, 7) - 1]}</text>`;
     const d = new Date(ms); ms = Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
@@ -384,8 +415,44 @@ function lineChart(o) {
   s += '</svg>';
   CHARTS[id] = {
     xs: ser.map((p) => x(p[0])), ys: roll.map(y),
-    tips: ser.map((p, i) => `${fmtDate(p[0])}<br><b>${(o.fmtTip || fmt1)(roll[i])}</b>${o.window ? ' ' + o.unit + ` <span class="mut">(${o.window}-Tage-Schnitt)</span><br>Tageswert: ${(o.fmtTip || fmt1)(p[1])} ${o.unit}` : ' ' + o.unit}`),
+    tips: ser.map((p, i) => `${o.fmtKey ? o.fmtKey(p[0]) : fmtDate(p[0])}<br><b>${(o.fmtTip || fmt1)(roll[i])}</b>${o.window ? ' ' + o.unit + ` <span class="mut">(${o.window}-Tage-Schnitt)</span><br>Tageswert: ${(o.fmtTip || fmt1)(p[1])} ${o.unit}` : ' ' + o.unit}`),
   };
+  return s;
+}
+function multiLine(o) {
+  // o.series: [{ name, color, values[12] }] · gleiche Monats-Achse, eine Linie pro Jahr
+  const H = o.height || 200, L = 34, R = 40, T = 12, B = 22;
+  const all = o.series.flatMap((s) => s.values).filter((v) => v != null);
+  if (!all.length) return '';
+  const lo = 0;
+  const step = niceStep(Math.max(...all) / 4), hi = step * Math.ceil(Math.max(...all) / step);
+  const n = o.labels.length;
+  const x = (i) => L + (W - L - R) * i / (n - 1);
+  const y = (v) => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  const id = 'c' + (++chartId);
+  let s = `<svg class="chart line" id="${id}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(o.title || '')}">`;
+  for (let v = lo; v <= hi + 1e-9; v += step) s += `<line class="grid${v === lo ? ' base' : ''}" x1="${L}" x2="${W - R}" y1="${y(v)}" y2="${y(v)}"/><text class="ax" x="${L - 6}" y="${y(v) + 3.5}" text-anchor="end">${(o.fmtAxis || compact)(v)}</text>`;
+  o.labels.forEach((l, i) => { if (i % 2 === 0) s += `<text class="ax" x="${x(i)}" y="${H - 7}" text-anchor="middle">${l}</text>`; });
+  const ends = [];
+  for (const se of o.series) {
+    let seg = [];
+    const flush = () => { if (seg.length > 1) s += `<polyline class="ln" points="${seg.join(' ')}" style="stroke:${se.color}"/>`; else if (seg.length === 1) { const [cx, cy] = seg[0].split(','); s += `<circle cx="${cx}" cy="${cy}" r="2.5" style="fill:${se.color}"/>`; } seg = []; };
+    se.values.forEach((v, i) => { if (v == null) flush(); else seg.push(`${x(i).toFixed(1)},${y(v).toFixed(1)}`); });
+    flush();
+    const li = se.values.map((v, i) => (v == null ? -1 : i)).filter((i) => i >= 0).pop();
+    if (li != null) ends.push({ name: se.name, color: se.color, x: x(li), y: y(se.values[li]) });
+  }
+  // Direktbeschriftung am Linienende, ohne Überlappung
+  ends.sort((a, b) => a.y - b.y);
+  for (let i = 1; i < ends.length; i++) if (ends[i].y - ends[i - 1].y < 12) ends[i].y = ends[i - 1].y + 12;
+  for (const e of ends) s += `<text class="lab" x="${e.x + 6}" y="${e.y + 4}" style="font-size:11px;font-weight:600">${esc(e.name)}</text>`;
+  s += `<line class="xh" x1="0" x2="0" y1="${T}" y2="${H - B}" style="display:none"/><circle class="xp" r="0" style="display:none"/>`;
+  s += `<rect class="ov" x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}"/></svg>`;
+  CHARTS[id] = {
+    multi: true, xs: o.labels.map((_, i) => x(i)), ys: o.labels.map(() => T + 10),
+    tips: o.labels.map((l, i) => `<b>${o.full ? o.full[i] : l}</b><br>` + o.series.slice().reverse().map((se) => `<span class="sw" style="background:${se.color}"></span>${esc(se.name)}: <b>${se.values[i] == null ? '–' : (o.fmtTip || fmt)(se.values[i])}</b>`).join('<br>')),
+  };
+  s += `<div class="legend">${o.series.map((se) => `<span><i style="background:${se.color}"></i>${esc(se.name)}</span>`).join('')}</div>`;
   return s;
 }
 function niceStep(raw) {
@@ -478,7 +545,7 @@ function setupTips() {
       c.xs.forEach((xx, i) => { const d = Math.abs(xx - p.x); if (d < bd) { bd = d; bi = i; } });
       const xh = svg.querySelector('.xh'), xp = svg.querySelector('.xp');
       xh.setAttribute('x1', c.xs[bi]); xh.setAttribute('x2', c.xs[bi]); xh.style.display = '';
-      xp.setAttribute('cx', c.xs[bi]); xp.setAttribute('cy', c.ys[bi]); xp.style.display = '';
+      xp.setAttribute('cx', c.xs[bi]); xp.setAttribute('cy', c.ys[bi]); xp.style.display = c.multi ? 'none' : '';
       const sp = svg.createSVGPoint(); sp.x = c.xs[bi]; sp.y = c.ys[bi];
       const scr = sp.matrixTransform(svg.getScreenCTM());
       show(c.tips[bi], scr.x, scr.y);
@@ -627,10 +694,163 @@ function viewWorkouts() {
 }
 function paceStr(minPerKm) { const m = Math.floor(minPerKm), s = Math.round((minPerKm - m) * 60); return `${m}:${String(s === 60 ? 0 : s).padStart(2, '0')}`; }
 
+/* ── Jahre: Langzeit-Blick ─────────────────────────────────────────────────── */
+const YEAR_COLORS = ['var(--s1)', 'var(--s2)', 'var(--s3)', 'var(--s4)'];
+const yLab = (Y) => String(Y.y) + (Y.partial ? '*' : '');
+
+// Entwicklung erstes → letztes Jahr (nur Jahre mit genug Daten)
+function developments(years) {
+  const ok = (f) => years.filter((Y) => f(Y.st) != null && f(Y.st) > 0);
+  const defs = [
+    ['👟', 'Schritte pro Tag', (st) => st.steps.n >= 30 ? st.steps.avg : null, fmt, 'hi', ''],
+    ['🏋️', 'Workouts pro Woche', (st) => st.nDays >= 30 ? st.workouts.perWeek : null, fmt1, 'hi', ''],
+    ['❤️', 'Ruhepuls', (st) => st.heart.rhrSeries.length >= 30 ? st.heart.rhr : null, fmt, 'lo', ' bpm'],
+    ['〰️', 'HRV', (st) => st.heart.hrvSeries.length >= 30 ? st.heart.hrv : null, fmt, 'hi', ' ms'],
+    ['🫁', 'VO₂max', (st) => st.vo2 && st.vo2.series.length >= 3 ? mean(st.vo2.series.slice(-5).map((x) => x[1])) : null, fmt1, 'hi', ''],
+    ['😴', 'Schlaf pro Nacht', (st) => st.sleep.n >= 30 ? st.sleep.avg : null, hm, null, ''],
+    ['🌙', 'Schlafenszeit', (st) => st.sleep.n >= 30 ? st.sleep.bed + 1440 : null, (v) => clock(v) + ' Uhr', null, ''],
+    ['⚖️', 'Gewicht', (st) => st.weight && st.weight.series.length >= 3 ? mean(st.weight.series.slice(-5).map((x) => x[1])) : null, fmt1, null, ' kg'],
+  ];
+  const out = [];
+  for (const [ic, label, f, fm, better, unit] of defs) {
+    const ys = ok(f);
+    if (ys.length < 2) continue;
+    const a = ys[0], b = ys[ys.length - 1];
+    const va = f(a.st), vb = f(b.st);
+    let dtxt;
+    if (label === 'Schlaf pro Nacht') { const d = Math.round(vb - va); dtxt = (d >= 0 ? '+' : '−') + Math.abs(d) + ' min'; }
+    else if (label === 'Schlafenszeit') { const d = Math.round(vb - va); dtxt = Math.abs(d) < 3 ? 'gleich' : Math.abs(d) + (d < 0 ? ' min früher' : ' min später'); }
+    else if (unit) dtxt = (vb >= va ? '+' : '−') + fm(Math.abs(vb - va)) + unit;
+    else dtxt = (vb >= va ? '+' : '−') + fmt(Math.abs(vb / va - 1) * 100) + ' %';
+    const good = better === 'hi' ? vb > va : better === 'lo' ? vb < va : null;
+    out.push({ ic, label, a: a.y, b: b.y, va: fm(va) + unit, vb: fm(vb) + unit, d: dtxt, good, raw: [va, vb] });
+  }
+  return out;
+}
+
+function viewYears() {
+  const years = yearList(S.data);
+  if (years.length < 2) {
+    return `<p class="leer">Für den Langzeit-Blick braucht es Daten aus mindestens zwei Kalenderjahren.<br>Aktuell gibt es Daten aus ${years.length ? years[0].y : 'keinem vollständigen Jahr'}.</p>`;
+  }
+  const P = allPeriod(S.data), all = compute(S.data, P.from, P.to);
+  const partialNote = years.some((Y) => Y.partial) ? '<p class="foot">* Jahr nicht vollständig erfasst – Summen sind dort kleiner, Durchschnitte bleiben vergleichbar.</p>' : '';
+  const best = years.filter((Y) => Y.st.steps.n >= 30).reduce((b, Y) => (!b || Y.st.steps.avg > b.st.steps.avg ? Y : b), null);
+  let h = `<button class="story-cta all" data-story="all"><span class="sc-k">Deine Health-Geschichte</span><span class="sc-t">${P.short}: alle Jahre als Story</span><span class="sc-p">▶</span></button>`;
+
+  const tiles = [];
+  if (all.steps.total) tiles.push(tile({ label: 'Schritte gesamt', color: 'var(--c-act)', value: all.steps.total >= 1e6 ? fmt1(all.steps.total / 1e6) : fmt(all.steps.total), unit: all.steps.total >= 1e6 ? 'Mio.' : '', sub: `seit ${fmtDate(all.keys[0])}` }));
+  if (all.km) tiles.push(tile({ label: 'Gehstrecke gesamt', color: 'var(--c-act)', value: fmt(all.km), unit: 'km', sub: (distanceCompare(all.km) || [0, ''])[1] ? `weiter als ${distanceCompare(all.km)[1]}` : '' }));
+  if (all.workouts.n) tiles.push(tile({ label: 'Workouts gesamt', color: 'var(--c-work)', value: fmt(all.workouts.n), sub: `${fmt(all.workouts.min / 60)} Stunden Training` }));
+  if (all.sleep.n) tiles.push(tile({ label: 'Nächte erfasst', color: 'var(--c-sleep)', value: fmt(all.sleep.n), sub: `Ø ${hm(all.sleep.avg)}` }));
+  h += `<div class="tiles">${tiles.join('')}</div>`;
+
+  const dev = developments(years);
+  if (dev.length) {
+    h += card('Deine Entwicklung', `<ul class="list dev">${dev.map((d) => `<li><span>${d.ic} ${esc(d.label)}</span><b>${d.d}${d.good === true ? ' <span class="ok">✓</span>' : ''}</b><em>${d.a}: ${d.va} → ${d.b}: <b>${d.vb}</b></em></li>`).join('')}</ul>`,
+      `Erstes Jahr mit Daten im Vergleich zum letzten · ✓ = Entwicklung in die gesunde Richtung`);
+  }
+
+  const stepYears = years.filter((Y) => Y.st.steps.n);
+  if (stepYears.length) {
+    h += card('Schritte pro Jahr', barChart({ title: 'Schritte pro Jahr', values: stepYears.map((Y) => Y.st.steps.avg), labels: stepYears.map(yLab), color: 'var(--c-act)',
+      tips: stepYears.map((Y) => `${Y.y}${Y.partial ? ' (unvollständig)' : ''}<br><b>${fmt(Y.st.steps.avg)}</b> Schritte pro Tag<br>${fmt(Y.st.steps.total)} insgesamt · ${fmt(Y.st.km)} km`),
+      highlight: best ? stepYears.indexOf(best) : null, ref: 10000, refLabel: 'Ziel 10.000', height: 160 }),
+    `Durchschnitt pro Tag · aktivstes Jahr: <b>${best ? best.y : '–'}</b>`);
+
+    const shown = stepYears.slice(-4);
+    h += card('Jahre im Vergleich', multiLine({ title: 'Schritte pro Monat je Jahr', labels: MON, full: MONTH,
+      series: shown.map((Y, i) => ({ name: String(Y.y), color: YEAR_COLORS[shown.length - 1 - i], values: Y.st.months.length ? MON.map((_, m) => { const M = Y.st.months.find((x) => x.m === m + 1); return M && M.steps ? M.steps : null; }) : [] })),
+      fmtTip: fmt }), `Ø Schritte pro Tag, Monat für Monat${stepYears.length > 4 ? ' · die letzten vier Jahre' : ''}`);
+  }
+
+  const wYears = years.filter((Y) => Y.st.workouts.n || Y.st.nDays > 60);
+  if (all.workouts.n) {
+    h += card('Workouts pro Jahr', barChart({ title: 'Workouts pro Jahr', values: wYears.map((Y) => Y.st.workouts.n), labels: wYears.map(yLab), color: 'var(--c-work)', integer: true, fmtAxis: (v) => fmt(v),
+      tips: wYears.map((Y) => `${Y.y}<br><b>${Y.st.workouts.n}</b> Workouts · ${fmt(Y.st.workouts.min / 60)} h<br>${fmt1(Y.st.workouts.perWeek)} pro Woche`), height: 150 }));
+    h += card('Lieblingssport je Jahr', `<ul class="list">${wYears.filter((Y) => Y.st.workouts.types[0]).map((Y) => {
+      const t = Y.st.workouts.types; return `<li><span><b class="yr">${yLab(Y)}</b> ${sportIcon(t[0].t)} ${esc(sportName(t[0].t))}</span><b>${fmt(t[0].min / 60)} h</b><em>${t.slice(1, 3).map((x) => sportIcon(x.t) + ' ' + esc(sportName(x.t))).join(' · ') || '&nbsp;'}</em></li>`;
+    }).join('')}</ul>`, 'Nach Trainingszeit, darunter Platz 2 und 3');
+  }
+
+  const M = all.months;
+  const mser = (f) => M.filter((m) => f(m) != null && f(m) > 0).map((m) => [`${m.key}-15`, f(m)]);
+  const fk = (k) => `${MONTH[+k.slice(5, 7) - 1]} ${k.slice(0, 4)}`;
+  const longLine = (title, f, color, unit, sub, extra = {}) => {
+    const ser = mser(f);
+    if (ser.length < 4) return '';
+    return card(title, lineChart({ title, series: ser, from: P.from, to: P.to, color, unit, fmtKey: fk, ...extra }), sub);
+  };
+  h += longLine('Ruhepuls über die Jahre', (m) => m.rhr, 'var(--c-heart)', 'bpm', 'Monatsdurchschnitt', { fmtTip: fmt });
+  h += longLine('HRV über die Jahre', (m) => m.hrv, 'var(--c-heart)', 'ms', 'Monatsdurchschnitt · höher = meist besser erholt', { fmtTip: fmt });
+  h += longLine('VO₂max über die Jahre', (m) => m.vo2, 'var(--c-heart)', 'ml/kg·min', 'Monatsdurchschnitt');
+  h += longLine('Schlaf über die Jahre', (m) => m.sleep && m.sleep / 60, 'var(--c-sleep)', 'h', 'Ø Schlafdauer pro Nacht, Monatsdurchschnitt', { fmtTip: (v) => hm(v * 60), fmtAxis: (v) => fmt1(v).replace(',0', '') + ' h' });
+  h += longLine('Gewicht über die Jahre', (m) => m.wt, 'var(--c-body)', 'kg', 'Monatsdurchschnitt');
+
+  h += card('Alle Jahre in Zahlen', yearTable(years) + partialNote, 'Wischen für weitere Jahre · ★ = bestes Jahr');
+
+  const runs = S.data.workouts.filter((w) => w.t === 'Running' && w.km > 0);
+  const longestRun = runs.reduce((b, w) => (!b || w.km > b.km ? w : b), null);
+  h += card('Rekorde aller Zeiten', `<ul class="list">
+      ${all.steps.best ? `<li><span>🏆 Meiste Schritte</span><b>${fmt(all.steps.best[1])}</b><em>${fmtDate(all.steps.best[0])}</em></li>` : ''}
+      ${all.steps.streak ? `<li><span>🔥 Längste 10k-Serie</span><b>${all.steps.streak} Tage</b><em>${fmtDate(all.steps.streakStart)} – ${fmtDate(all.steps.streakEnd)}</em></li>` : ''}
+      ${best ? `<li><span>📈 Aktivstes Jahr</span><b>${best.y}</b><em>Ø ${fmt(best.st.steps.avg)} Schritte pro Tag</em></li>` : ''}
+      ${all.heart.rhrMin ? `<li><span>💓 Niedrigster Ruhepuls</span><b>${fmt(all.heart.rhrMin[1])} bpm</b><em>${fmtDate(all.heart.rhrMin[0])}</em></li>` : ''}
+      ${all.workouts.longest ? `<li><span>⏱️ Längstes Workout</span><b>${hm(all.workouts.longest.dur)}</b><em>${sportName(all.workouts.longest.t)}, ${fmtDate(all.workouts.longest.d)}</em></li>` : ''}
+      ${longestRun ? `<li><span>🏃 Längster Lauf</span><b>${fmt1(longestRun.km)} km</b><em>${fmtDate(longestRun.d)}</em></li>` : ''}
+      ${all.sleep.longest ? `<li><span>😴 Längste Nacht</span><b>${hm(all.sleep.longest[1].a)}</b><em>${fmtDate(all.sleep.longest[0])}</em></li>` : ''}
+    </ul>`);
+  return h;
+}
+
+function yearTable(years) {
+  const rows = [
+    ['Ø Schritte/Tag', (st) => st.steps.n ? st.steps.avg : null, fmt, 'hi'],
+    ['Kilometer', (st) => st.km || null, fmt, 'hi', true],
+    ['Tage ≥ 10.000', (st) => st.steps.n ? st.steps.over10k : null, fmt, 'hi', true],
+    ['Längste 10k-Serie', (st) => st.steps.n ? st.steps.streak : null, fmt, 'hi', true],
+    ['Workouts', (st) => st.workouts.n || null, fmt, 'hi', true],
+    ['Workouts/Woche', (st) => st.workouts.n ? st.workouts.perWeek : null, fmt1, 'hi'],
+    ['Trainingsstunden', (st) => st.workouts.n ? st.workouts.min / 60 : null, fmt, 'hi', true],
+    ['Top-Sport', (st) => st.workouts.types[0] ? sportIcon(st.workouts.types[0].t) + ' ' + sportName(st.workouts.types[0].t) : null, (v) => esc(v), null],
+    ['Ø Aktivkalorien', (st) => st.kcal.avg, fmt, 'hi'],
+    ['Ø Ruhepuls', (st) => st.heart.rhr, fmt, 'lo'],
+    ['Ø HRV', (st) => st.heart.hrv, fmt, 'hi'],
+    ['VO₂max (zuletzt)', (st) => st.vo2 ? st.vo2.last[1] : null, fmt1, 'hi'],
+    ['Ø Schlaf', (st) => st.sleep.n ? st.sleep.avg : null, (v) => hm(v).replace(' min', ''), null],
+    ['Schlafenszeit', (st) => st.sleep.n ? st.sleep.bed : null, clock, null],
+    ['Bewegungsring', (st) => st.rings ? st.rings.move / st.rings.n * 100 : null, (v) => fmt(v) + ' %', 'hi'],
+    ['Gewicht (zuletzt)', (st) => st.weight ? st.weight.last[1] : null, fmt1, null],
+  ];
+  let t = `<div class="tbl-wrap"><table class="ytbl"><thead><tr><th></th>${years.map((Y) => `<th>${yLab(Y)}</th>`).join('')}</tr></thead><tbody>`;
+  for (const [label, f, fm, better, isSum] of rows) {
+    const vals = years.map((Y) => f(Y.st));
+    if (vals.every((v) => v == null)) continue;
+    let bi = -1;
+    if (better) {
+      vals.forEach((v, i) => {
+        if (v == null || (isSum && years[i].partial)) return;
+        if (bi < 0 || (better === 'hi' ? v > vals[bi] : v < vals[bi])) bi = i;
+      });
+    }
+    t += `<tr><th>${esc(label)}</th>${vals.map((v, i) => `<td${i === bi ? ' class="best"' : ''}>${v == null ? '–' : (i === bi ? '★ ' : '') + fm(v)}</td>`).join('')}</tr>`;
+  }
+  return t + '</tbody></table></div>';
+}
+
 function viewStories() {
   const ps = periods(S.data);
   const grads = ['linear-gradient(135deg,#ff0080,#7928ca)', 'linear-gradient(135deg,#f7971e,#ff3d5a)', 'linear-gradient(135deg,#00c9a7,#3a47d5)', 'linear-gradient(135deg,#fc466b,#3f5efb)'];
-  return `<p class="intro">Dein Jahr als Story: die wichtigsten Zahlen, Rekorde und Muster, Folie für Folie. Antippen rechts = weiter, links = zurück, gedrückt halten = Pause.</p>
+  const ys = yearList(S.data);
+  const allCard = ys.length >= 2 ? (() => {
+    const P = allPeriod(S.data), a = compute(S.data, P.from, P.to);
+    return `<button class="story-card wide" data-story="all" style="background:linear-gradient(120deg,#0f0c29,#302b63 45%,#ff0080)">
+        <span class="k">Deine Health-Geschichte</span><span class="y">${P.short}</span>
+        <span class="k">${ys.length} Jahre${a.steps.total ? ' · ' + fmt1(a.steps.total / 1e6) + ' Mio. Schritte' : ''}${a.workouts.n ? ' · ' + fmt(a.workouts.n) + ' Workouts' : ''}</span>
+        <span class="go">Story über alle Jahre ansehen ▶</span></button>`;
+  })() : '';
+  return `<p class="intro">Deine Daten als Story: die wichtigsten Zahlen, Rekorde und Entwicklungen, Folie für Folie. Antippen rechts = weiter, links = zurück, gedrückt halten = Pause.</p>
+    ${allCard}
     <div class="story-grid">${ps.map((p, i) => {
       const st = compute(S.data, p.from, p.to);
       return `<button class="story-card" data-story="${p.id}" style="background:${grads[i % grads.length]}">
@@ -675,10 +895,10 @@ const TABS = [
   ['start', 'Übersicht', '<path d="M4 13h4v7H4zM10 8h4v12h-4zM16 4h4v16h-4z"/>'],
   ['trends', 'Trends', '<path d="M3 17l5-6 4 4 8-9" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>'],
   ['workouts', 'Workouts', '<path d="M13.5 5.5a2 2 0 1 0 0-.01zM9 21l2-6 3 3v3h2v-4.5l-2.5-2.6.8-3.2A6 6 0 0 0 18 13v-2a4 4 0 0 1-3.4-1.9l-1-1.6a2 2 0 0 0-2.4-.8L6 9v5h2v-3.6l1.8-.7L7 21z"/>'],
+  ['jahre', 'Jahre', '<path d="M5 3h2v2h10V3h2v2h1a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1h1zm-0 6v10h14V9zm2 2h3v3H7zm5 0h3v3h-3z"/>'],
   ['story', 'Rückblick', '<path d="M12 2l2.6 6.3 6.4.5-4.9 4.2 1.5 6.5L12 16l-5.6 3.5 1.5-6.5L3 8.8l6.4-.5z"/>'],
-  ['daten', 'Daten', '<path d="M12 3C7 3 4 4.6 4 6.5v11C4 19.4 7 21 12 21s8-1.6 8-3.5v-11C20 4.6 17 3 12 3zm0 2c3.9 0 6 1.1 6 1.5S15.9 8 12 8 6 6.9 6 6.5 8.1 5 12 5zm0 14c-3.9 0-6-1.1-6-1.5v-2.2c1.5.8 3.6 1.2 6 1.2s4.5-.4 6-1.2v2.2c0 .4-2.1 1.5-6 1.5zm0-4.5c-3.9 0-6-1.1-6-1.5V10.8c1.5.8 3.6 1.2 6 1.2s4.5-.4 6-1.2V13c0 .4-2.1 1.5-6 1.5z"/>'],
 ];
-const TITLES = { start: 'Übersicht', trends: 'Trends', workouts: 'Workouts', story: 'Rückblick', daten: 'Daten' };
+const TITLES = { start: 'Übersicht', trends: 'Trends', workouts: 'Workouts', jahre: 'Jahre', story: 'Rückblick', daten: 'Daten' };
 
 function render() {
   const main = $('#main');
@@ -690,11 +910,13 @@ function render() {
   $('#tabbar').hidden = false;
   for (const k in CHARTS) delete CHARTS[k];
   const withPicker = ['start', 'trends', 'workouts'].includes(S.tab);
-  const body = { start: viewOverview, trends: viewTrends, workouts: viewWorkouts, story: viewStories, daten: viewData }[S.tab]();
-  main.innerHTML = `<header class="lt"><h1>${TITLES[S.tab]}</h1>${withPicker ? periodPicker() : ''}</header>
+  const body = { start: viewOverview, trends: viewTrends, workouts: viewWorkouts, jahre: viewYears, story: viewStories, daten: viewData }[S.tab]();
+  main.innerHTML = `<div class="navbar">${S.tab === 'daten' ? '<button data-go="start">‹ Übersicht</button>' : '<span></span><button data-go="daten" aria-label="Daten verwalten">Daten</button>'}</div>
+    <header class="lt"><h1>${TITLES[S.tab]}</h1>${withPicker ? periodPicker() : ''}</header>
     ${S.data.source === 'demo' && S.tab !== 'daten' ? '<div class="demo-note">Beispieldaten · <button data-act="import">eigenen Export einlesen</button></div>' : ''}
     ${body}`;
   document.querySelectorAll('#tabbar button').forEach((b) => b.classList.toggle('on', b.dataset.tab === S.tab));
+  document.querySelectorAll('.tbl-wrap').forEach((e) => (e.scrollLeft = e.scrollWidth)); // neueste Jahre zuerst sichtbar
 }
 
 function welcome() {
@@ -762,8 +984,10 @@ async function init() {
   document.addEventListener('click', async (e) => {
     const tb = e.target.closest('#tabbar button');
     if (tb) { S.tab = tb.dataset.tab; render(); scrollTo(0, 0); return; }
+    const go = e.target.closest('[data-go]');
+    if (go) { S.tab = go.dataset.go; render(); scrollTo(0, 0); return; }
     const sb = e.target.closest('[data-story]');
-    if (sb) { const p = periods(S.data).find((x) => x.id === sb.dataset.story); if (p) openStory(S.data, p); return; }
+    if (sb) { const p = sb.dataset.story === 'all' ? allPeriod(S.data) : periods(S.data).find((x) => x.id === sb.dataset.story); if (p) openStory(S.data, p); return; }
     const a = e.target.closest('[data-act]');
     if (!a) return;
     const act = a.dataset.act;
