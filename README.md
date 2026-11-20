@@ -1,3 +1,10 @@
+> **Neu: [Shisha Express](shisha/)**: ein schnelles Raser-Spiel von oben unter enormem Zeitdruck (mit Passwort).
+> München → A94 → P+R Markt Schwaben, zu Fuß zum roten Flitzer, über Erding und am Flughafen vorbei zum Moosburg Hbf,
+> über A92/A93 nach Regensburg Hbf, zu Fuß zum Taxi und durch die Altstadt zur Shisha Lounge.
+> Uhren auf der Straße geben +2 s, Blitzer über 120 km/h holen die Polizei (Strafzettel −6 s).
+> Das Foto im Spiel ist verschlüsselt und wird erst nach Eingabe des Passworts im Browser entschlüsselt.
+> Adresse: `https://dadane87.github.io/PlannDaShit/shisha/` · Steuerung: Pfeiltasten/WASD, am Handy Tasten unten.
+
 > **Neu: [Health-Rückblick](gesundheit/)**: die eigenen Apple-Health-Daten als iPhone-App ausgewertet.
 > **Übersicht** (Kennzahlen wie Ø Schritte, Distanz, Tage ≥ 10.000, längste Serie, Aktivkalorien, Trainingsminuten,
 > Ruhepuls, HRV, Schlafdauer und -zeit, Stockwerke, Aktivitätsringe, VO₂max, Gewicht, jeweils mit Vergleich zum Vorjahr,
