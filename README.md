@@ -6,6 +6,9 @@
 > Export bis **12.000 px** lange Seite (über 100 MP): Das Bild wird streifenweise gerendert und von einem eigenen JPEG-Encoder im Worker
 > geschrieben, so dass die Canvas-Grenze von Safari nicht stört. Fotos werden dafür in voller Auflösung neu geladen. Ergebnis über
 > *In Fotos sichern oder teilen* direkt in die Fotos-App. Vollbild-Ansicht mit Pinch-Zoom bis auf einzelne Fotos.
+> **Fotos filtern:** nach Jahr oder eigenem Zeitraum (Aufnahmedatum aus den EXIF-Daten, lokal gelesen) und nach Sammlungen:
+> Jede Auswahl, z. B. ein ganzes Album aus der iOS-Fotoauswahl, wird als eigene Sammlung gemerkt (automatisch benannt, z. B. „Juli 2024“,
+> umbenennbar) und lässt sich im Mosaik an- und abschalten. Die Fotoübersicht ist nach Monaten sortiert.
 > **Datenschutz:** Alles wird auf dem iPhone verarbeitet, nichts geht in eine Cloud. Es gibt keinen Server, kein Konto und keine
 > Statistik; eine Content-Security-Policy (`connect-src 'none'`, `form-action 'none'`) verbietet dem Browser jede Datenübertragung.
 > Nach dem ersten Öffnen läuft die App per Service Worker auch komplett offline (Flugmodus). Die Auswahl bleibt nur lokal auf dem Gerät
