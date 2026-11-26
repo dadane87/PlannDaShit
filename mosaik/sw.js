@@ -1,7 +1,7 @@
 /* Offline-Speicher: Die App-Dateien werden beim ersten Öffnen auf dem Gerät abgelegt.
    Danach läuft die App komplett ohne Internet (auch im Flugmodus).
    Dieser Service Worker lädt nur die eigenen App-Dateien und sendet nie Daten. */
-const CACHE = 'mosaik-v2';
+const CACHE = 'mosaik-v3';
 const FILES = ['./', './index.html', './app.js', './engine.js', './shapes.js', './jpeg-worker.js',
   './manifest.json', './icon-192.png', './icon-512.png', './icon-maskable.png', './apple-touch-icon.png'];
 
