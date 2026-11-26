@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F2F2F7" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Mosaik">
+<meta name="format-detection" content="telephone=no">
+<meta name="robots" content="noindex">
+<title>Foto-Mosaik</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<style>
+:root{
+  --bg:#F2F2F7; --card:#FFFFFF; --text:#000; --text-2:rgba(60,60,67,.62); --text-3:rgba(60,60,67,.3);
+  --sep:rgba(60,60,67,.16); --fill:rgba(118,118,128,.12); --fill-2:rgba(118,118,128,.2); --seg:#fff;
+  --tint:#5E5CE6; --tint-2:rgba(94,92,230,.12); --ok:#34C759; --warn:#FF9500; --bad:#FF3B30;
+  --stage:#E5E5EA;
+  --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+  --font:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',system-ui,sans-serif;
+  --font-d:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',system-ui,sans-serif;
+  color-scheme:light dark;
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#000; --card:#1C1C1E; --text:#fff; --text-2:rgba(235,235,245,.62); --text-3:rgba(235,235,245,.3);
+  --sep:rgba(84,84,88,.55); --fill:rgba(118,118,128,.24); --fill-2:rgba(118,118,128,.36); --seg:#636366;
+  --tint:#7D7AFF; --tint-2:rgba(125,122,255,.18); --stage:#1C1C1E;
+}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:17px/1.35 var(--font);min-height:100vh;overflow-x:hidden}
+body.locked{overflow:hidden}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;padding:0}
+input,select,textarea{font:inherit;color:inherit}
+[hidden]{display:none!important}
+#main{max-width:1180px;margin:0 auto;padding:var(--safe-t) 16px calc(var(--safe-b) + 40px)}
+
+/* Titel */
+.lt{display:flex;align-items:flex-end;justify-content:space-between;gap:12px;padding:22px 4px 10px}
+.lt h1{font:700 34px/1.1 var(--font-d);letter-spacing:.2px;margin:0}
+.pill{font-size:15px;font-weight:600;color:var(--tint);background:var(--fill);border-radius:999px;padding:7px 14px;white-space:nowrap}
+
+/* Start */
+.welcome{max-width:560px;margin:0 auto;text-align:center;padding-top:16px}
+.hero{width:100%;aspect-ratio:16/10;border-radius:22px;overflow:hidden;margin:6px 0 22px;box-shadow:0 12px 34px rgba(94,92,230,.25)}
+.hero canvas{width:100%;height:100%;display:block}
+.welcome h2{font:800 30px/1.12 var(--font-d);margin:0 0 10px}
+.lead{font-size:17px;color:var(--text-2);margin:0 6px 22px}
+.btns{display:flex;flex-direction:column;gap:10px;margin:0 0 22px}
+.btn{display:block;width:100%;padding:15px;border-radius:14px;font-weight:600;font-size:17px;background:var(--card);color:var(--tint);text-align:center}
+.btn.primary{background:var(--tint);color:#fff}
+.btn.big{padding:16px;font-size:18px;border-radius:16px}
+.btn:active{opacity:.7}
+.btn:disabled{opacity:.4}
+.modes{display:grid;gap:10px;text-align:left;margin-bottom:22px}
+.mcard{display:grid;grid-template-columns:52px 1fr;gap:12px;align-items:center;background:var(--card);border-radius:16px;padding:12px 14px}
+.mcard canvas{width:52px;height:52px;border-radius:12px}
+.mcard b{display:block;font-size:16px}
+.mcard span{font-size:14px;color:var(--text-2)}
+.privacy{font-size:13.5px;color:var(--text-2);margin:0 8px 26px}
+
+/* Arbeitsbereich */
+.layout{display:grid;grid-template-columns:minmax(0,1fr);gap:0 24px}
+.layout>*{min-width:0}
+.stage-wrap{position:sticky;top:0;z-index:5;background:var(--bg);padding:calc(var(--safe-t) + 6px) 0 8px;margin:0 -16px;padding-left:16px;padding-right:16px}
+.stage{position:relative;height:min(46vh,88vw);width:100%;border-radius:16px;background:var(--stage);display:grid;place-items:center;overflow:hidden}
+.stage canvas{display:block;max-width:100%;max-height:100%;box-shadow:0 6px 22px rgba(0,0,0,.16);border-radius:2px;touch-action:manipulation}
+.stage .fab{position:absolute;right:10px;bottom:10px;width:36px;height:36px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;display:grid;place-items:center;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.stage .fab svg{width:18px;height:18px;fill:none;stroke:#fff;stroke-width:2.2;stroke-linecap:round}
+.busy{position:absolute;left:10px;top:10px;display:flex;align-items:center;gap:8px;background:rgba(0,0,0,.55);color:#fff;font-size:13px;font-weight:600;padding:6px 11px 6px 8px;border-radius:99px;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.busy i{width:14px;height:14px;border-radius:50%;border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.empty-msg{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:24px;color:var(--text-2);font-size:15px}
+.pv-info{font-size:13px;color:var(--text-2);text-align:center;margin-top:7px;min-height:18px;font-variant-numeric:tabular-nums}
+@media (min-width:900px){
+  .layout{grid-template-columns:minmax(0,1.35fr) minmax(340px,1fr);align-items:start}
+  .stage-wrap{margin:0;padding:12px 0;top:0}
+  .stage{height:calc(100vh - 110px)}
+}
+
+/* Segmente */
+.seg{display:flex;background:var(--fill);border-radius:10px;padding:2px;gap:2px;margin:10px 0 6px}
+.seg button{flex:1;padding:7px 4px;border-radius:8px;font-size:14px;font-weight:600;color:var(--text);white-space:nowrap}
+.seg button.on{background:var(--seg);box-shadow:0 3px 8px rgba(0,0,0,.12),0 0 0 .5px rgba(0,0,0,.04)}
+.seg.big button{padding:9px 4px;font-size:15px}
+.mode-desc{font-size:14px;color:var(--text-2);margin:4px 4px 14px}
+
+/* Gruppen im iOS-Stil */
+.gh{font-size:13px;font-weight:400;color:var(--text-2);text-transform:uppercase;letter-spacing:.3px;margin:22px 16px 7px}
+.group{background:var(--card);border-radius:12px;overflow:hidden}
+.row{padding:11px 16px;min-height:46px;display:flex;align-items:center;gap:12px;position:relative}
+.row+.row::before{content:"";position:absolute;top:0;left:16px;right:0;border-top:.5px solid var(--sep)}
+.row .rl{flex:1;min-width:0}
+.row .rv{color:var(--text-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.row.col{flex-direction:column;align-items:stretch;gap:8px}
+.row.col .top{display:flex;justify-content:space-between;gap:10px}
+.row .sub{font-size:13px;color:var(--text-2);margin-top:2px}
+.row.link{color:var(--tint);cursor:pointer}
+.row.link:active{background:var(--fill)}
+.row .chev{color:var(--text-3);font-size:20px;line-height:1}
+.row select{appearance:none;-webkit-appearance:none;border:0;background:var(--fill);border-radius:8px;padding:6px 26px 6px 10px;font-size:16px;color:var(--tint);
+  background-image:linear-gradient(45deg,transparent 50%,var(--tint) 50%),linear-gradient(135deg,var(--tint) 50%,transparent 50%);background-position:calc(100% - 13px) 52%,calc(100% - 8px) 52%;background-size:5px 5px;background-repeat:no-repeat}
+.row textarea,.row input[type=text]{width:100%;border:0;background:var(--fill);border-radius:10px;padding:10px 12px;font-size:20px;font-weight:800;resize:none;text-align:center;text-transform:none}
+.row .seg{margin:0;width:100%}
+.note{font-size:13px;color:var(--text-2);margin:7px 16px 0}
+.note.warn{color:var(--warn)}
+
+/* Regler */
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:28px;background:transparent;margin:0}
+input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(var(--tint),var(--tint)) 0/var(--p,50%) 100% no-repeat,var(--fill-2)}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:27px;height:27px;border-radius:50%;background:#fff;margin-top:-11.5px;box-shadow:0 3px 8px rgba(0,0,0,.15),0 1px 1px rgba(0,0,0,.16),0 0 0 .5px rgba(0,0,0,.04)}
+input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:var(--fill-2)}
+input[type=range]::-moz-range-progress{height:4px;border-radius:2px;background:var(--tint)}
+input[type=range]::-moz-range-thumb{width:25px;height:25px;border-radius:50%;background:#fff;border:0;box-shadow:0 3px 8px rgba(0,0,0,.2)}
+
+/* Schalter */
+.sw{position:relative;width:51px;height:31px;flex:none}
+.sw input{position:absolute;inset:0;opacity:0;margin:0;cursor:pointer;z-index:1}
+.sw span{position:absolute;inset:0;border-radius:99px;background:var(--fill-2);transition:background .2s}
+.sw span::after{content:"";position:absolute;left:2px;top:2px;width:27px;height:27px;border-radius:50%;background:#fff;box-shadow:0 3px 8px rgba(0,0,0,.15);transition:transform .2s}
+.sw input:checked+span{background:var(--ok)}
+.sw input:checked+span::after{transform:translateX(20px)}
+
+/* Farben */
+.swatches{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.swatches button,.swatches label{width:30px;height:30px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(0,0,0,.14);position:relative;flex:none}
+.swatches .on{outline:2.5px solid var(--tint);outline-offset:2px}
+.swatches label{background:conic-gradient(#f44,#fd4,#4d6,#4ce,#46f,#d4f,#f44);overflow:hidden;cursor:pointer}
+.swatches label input{position:absolute;inset:0;opacity:0;width:100%;height:100%;cursor:pointer}
+
+/* Formen-Auswahl */
+.shapes{display:flex;gap:8px;overflow-x:auto;margin:0 -16px;padding:2px 16px 4px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.shapes::-webkit-scrollbar{display:none}
+.shapes button{flex:none;width:64px;display:flex;flex-direction:column;align-items:center;gap:4px;font-size:11px;color:var(--text-2)}
+.shapes button canvas,.shapes button .ic{width:56px;height:56px;border-radius:12px;background:var(--fill);display:grid;place-items:center}
+.shapes button .ic{font:800 22px var(--font-d);color:var(--text)}
+.shapes button .ic svg{width:26px;height:26px;fill:none;stroke:var(--text);stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.shapes button.on canvas,.shapes button.on .ic{box-shadow:0 0 0 2.5px var(--tint)}
+.shapes button.on{color:var(--tint);font-weight:600}
+
+/* Foto-Leiste */
+.strip{display:flex;gap:4px;overflow:hidden;margin-top:2px}
+.strip img{width:40px;height:40px;border-radius:6px;object-fit:cover;flex:none;background:var(--fill)}
+.thumb-row{display:flex;align-items:center;gap:12px}
+.thumb-row img,.thumb-row .ph{width:56px;height:56px;border-radius:10px;object-fit:cover;background:var(--fill);flex:none}
+.thumb-row .ph{display:grid;place-items:center;color:var(--text-3);font-size:24px}
+
+/* Bottom-Sheet / Modal */
+.backdrop{position:fixed;inset:0;z-index:40;background:rgba(0,0,0,.4);display:flex;align-items:flex-end;justify-content:center;animation:fade .2s}
+@keyframes fade{from{opacity:0}}
+.sheet{background:var(--bg);width:100%;max-width:720px;max-height:92vh;border-radius:14px 14px 0 0;display:flex;flex-direction:column;animation:up .28s cubic-bezier(.2,.8,.2,1);padding-bottom:var(--safe-b)}
+@keyframes up{from{transform:translateY(40%);opacity:.3}}
+.sheet-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 10px;gap:10px}
+.sheet-head h3{margin:0;font:600 17px var(--font-d);flex:1;text-align:center}
+.sheet-head button{color:var(--tint);font-size:17px;min-width:70px;text-align:left}
+.sheet-head button:last-child{text-align:right;font-weight:600}
+.sheet-body{overflow-y:auto;padding:0 16px 16px;-webkit-overflow-scrolling:touch}
+.libgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:3px}
+.libgrid div{position:relative;aspect-ratio:1}
+.libgrid img{width:100%;height:100%;object-fit:cover;display:block;border-radius:3px}
+.libgrid button{position:absolute;top:3px;right:3px;width:22px;height:22px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:14px;line-height:22px;text-align:center}
+.center{display:flex;align-items:center;justify-content:center}
+.modal{background:var(--card);border-radius:20px;padding:22px 20px 18px;width:min(380px,calc(100% - 32px));margin:auto;text-align:center;animation:pop .25s cubic-bezier(.2,.8,.2,1)}
+@keyframes pop{from{transform:scale(.92);opacity:0}}
+.modal h3{margin:0 0 6px;font:700 20px var(--font-d)}
+.modal p{margin:0 0 14px;color:var(--text-2);font-size:15px}
+.track{height:8px;background:var(--fill);border-radius:99px;overflow:hidden;margin:16px 0 10px}
+.track i{display:block;height:100%;width:0;background:var(--tint);border-radius:99px;transition:width .2s}
+.modal .res{width:100%;max-height:42vh;object-fit:contain;border-radius:10px;margin:4px 0 12px;background:var(--fill)}
+.modal .btn+.btn{margin-top:8px}
+.modal .btn{background:var(--fill)}
+.modal .btn.primary{background:var(--tint)}
+.facts{font-size:14px;color:var(--text-2);margin:0 0 16px;font-variant-numeric:tabular-nums}
+.facts b{color:var(--text);font-weight:600}
+
+/* Vollbild-Betrachter */
+#viewer{position:fixed;inset:0;z-index:50;background:#0b0b0c;touch-action:none}
+#viewer canvas{position:absolute;inset:0;width:100%;height:100%}
+#viewer .close{position:absolute;top:calc(var(--safe-t) + 12px);right:14px;width:38px;height:38px;border-radius:50%;background:rgba(60,60,60,.65);color:#fff;font-size:20px;
+  -webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+#viewer .vhint{position:absolute;left:0;right:0;bottom:calc(var(--safe-b) + 18px);text-align:center;color:rgba(255,255,255,.7);font-size:13px;pointer-events:none;transition:opacity .6s}
+
+#toast{position:fixed;left:50%;bottom:calc(var(--safe-b) + 24px);transform:translateX(-50%) translateY(20px);opacity:0;z-index:70;background:rgba(30,30,30,.92);color:#fff;
+  padding:10px 16px;border-radius:12px;font-size:14px;max-width:calc(100% - 32px);text-align:center;transition:.25s;pointer-events:none}
+#toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<main id="main">
+  <div class="lt"><h1>Mosaik</h1><button id="libBtn" class="pill" hidden>Fotos</button></div>
+
+  <section id="welcome" class="welcome" hidden>
+    <div class="hero"><canvas id="heroCv" width="1120" height="700"></canvas></div>
+    <h2>Aus deinen Fotos wird ein Mosaik</h2>
+    <p class="lead">Wähle Bilder aus deiner Galerie. Die App setzt sie zu einem hochaufgelösten Mosaik zusammen, das du in Fotos sichern oder drucken kannst.</p>
+    <div class="btns">
+      <button class="btn primary big" id="pickFirst">Fotos auswählen</button>
+      <button class="btn" id="demoBtn">Mit Beispielfotos ausprobieren</button>
+    </div>
+    <div class="modes">
+      <div class="mcard"><canvas data-ic="raster" width="104" height="104"></canvas><div><b>Raster</b><span>Klassisches Mosaik, zufällig, als Farbverlauf oder nach Helligkeit sortiert</span></div></div>
+      <div class="mcard"><canvas data-ic="form" width="104" height="104"></canvas><div><b>Form</b><span>Herz, Stern, Text, Zahl oder ein eigenes Bild als Umriss</span></div></div>
+      <div class="mcard"><canvas data-ic="haupt" width="104" height="104"></canvas><div><b>Hauptbild</b><span>Viele kleine Fotos ergeben zusammen ein großes Bild</span></div></div>
+    </div>
+    <p class="privacy">Deine Fotos bleiben auf dem Gerät. Sie werden nur hier im Browser verarbeitet und nirgends hochgeladen.</p>
+  </section>
+
+  <section id="work" hidden>
+    <div class="layout">
+      <div class="stage-wrap">
+        <div class="stage" id="stage">
+          <canvas id="pv"></canvas>
+          <div class="empty-msg" id="pvEmpty" hidden></div>
+          <div class="busy" id="pvBusy" hidden><i></i><span>Berechne …</span></div>
+          <button class="fab" id="zoomBtn" aria-label="Vergrößern"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></button>
+        </div>
+        <div class="pv-info" id="pvInfo"></div>
+      </div>
+      <div class="panel">
+        <div class="seg big" id="modeSeg"><button data-m="raster">Raster</button><button data-m="form">Form</button><button data-m="haupt">Hauptbild</button></div>
+        <p class="mode-desc" id="modeDesc"></p>
+        <div class="group" id="gMode"></div>
+        <div id="gModeNote"></div>
+        <h4 class="gh">Gestaltung</h4>
+        <div class="group" id="gLook"></div>
+        <h4 class="gh">Fotos</h4>
+        <div class="group" id="gPhotos"></div>
+        <h4 class="gh">Ausgabe</h4>
+        <div class="group" id="gOut"></div>
+        <p class="note" id="outNote"></p>
+        <div style="height:16px"></div>
+        <button class="btn primary big" id="goBtn">Mosaik erstellen</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<div id="viewer" hidden><canvas></canvas><button class="close" aria-label="Schließen">✕</button><div class="vhint">Zum Zoomen auseinanderziehen · Doppeltippen</div></div>
+<div id="toast"></div>
+<input type="file" id="inPhotos" accept="image/*" multiple hidden>
+<input type="file" id="inTarget" accept="image/*" hidden>
+<input type="file" id="inMask" accept="image/*" hidden>
+<script type="module" src="app.js"></script>
+</body>
+</html>
