@@ -900,4 +900,6 @@ function wire() {
 }
 
 wire();
+// Offline-Modus: App-Dateien auf dem Gerät ablegen (sendet keine Daten)
+if ('serviceWorker' in navigator && location.protocol !== 'file:') navigator.serviceWorker.register('sw.js').catch(() => {});
 restore().then(refresh, refresh);

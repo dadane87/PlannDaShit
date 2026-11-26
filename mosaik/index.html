@@ -9,6 +9,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Mosaik">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'none'; font-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'">
+<meta name="referrer" content="no-referrer">
 <meta name="format-detection" content="telephone=no">
 <meta name="robots" content="noindex">
 <title>Foto-Mosaik</title>
@@ -209,7 +211,7 @@ input[type=range]::-moz-range-thumb{width:25px;height:25px;border-radius:50%;bac
       <div class="mcard"><canvas data-ic="form" width="104" height="104"></canvas><div><b>Form</b><span>Herz, Stern, Text, Zahl oder ein eigenes Bild als Umriss</span></div></div>
       <div class="mcard"><canvas data-ic="haupt" width="104" height="104"></canvas><div><b>Hauptbild</b><span>Viele kleine Fotos ergeben zusammen ein großes Bild</span></div></div>
     </div>
-    <p class="privacy">Deine Fotos bleiben auf dem Gerät. Sie werden nur hier im Browser verarbeitet und nirgends hochgeladen.</p>
+    <p class="privacy"><b>Alles bleibt auf deinem iPhone.</b> Die Fotos werden nur hier auf dem Gerät verarbeitet und nie hochgeladen. Es gibt keinen Server, kein Konto, keine Cloud und keine Statistik. Nach dem ersten Öffnen funktioniert die App auch im Flugmodus.</p>
   </section>
 
   <section id="work" hidden>
