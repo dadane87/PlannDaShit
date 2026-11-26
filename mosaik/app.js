@@ -34,6 +34,7 @@ const RES = [[3000, '3K'], [6000, '6K'], [9000, '9K'], [12000, '12K']];
 const BGS = ['#ffffff', '#f3ede2', '#8e8e93', '#1c1c1e', '#000000'];
 const DEF = {
   mode: 'raster', res: 6000, seed: 1,
+  filter: { range: 'all', from: '', to: '', off: [] },
   raster: { format: 'auto', autoCols: true, cols: 8, sort: 'zufall', big: 0, gap: 0.04, radius: 0, bg: '#ffffff' },
   form: { format: 'auto', shape: 'herz', text: 'LOVE', cols: 36, sort: 'zufall', threshold: 0.5, invert: false, gap: 0.06, radius: 0.12, bg: '#ffffff' },
   haupt: { format: 'auto', cols: 60, variety: 0.5, spacing: 2, color: 0.3, alpha: 0.12, gap: 0, radius: 0, bg: '#ffffff' },
@@ -42,7 +43,7 @@ function loadSettings() {
   let s = {};
   try { s = JSON.parse(localStorage.getItem('mosaik-settings') || '{}'); } catch (e) {}
   const o = { ...DEF, ...s };
-  for (const m of ['raster', 'form', 'haupt']) o[m] = { ...DEF[m], ...(s[m] || {}) };
+  for (const m of ['raster', 'form', 'haupt', 'filter']) o[m] = { ...DEF[m], ...(s[m] || {}) };
   return o;
 }
 const S = loadSettings();
@@ -74,7 +75,8 @@ const idb = {
   },
   putTile(t) {
     return this.run('tiles', 'readwrite', (s) => s.put({ id: t.id, key: t.key, order: t.order, size: t.size, blob: t.blob,
-      feat: Array.from(t.feat), rgb: t.rgb, hue: t.hue, sat: t.sat, light: t.light, lum: t.lum }));
+      feat: Array.from(t.feat), rgb: t.rgb, hue: t.hue, sat: t.sat, light: t.light, lum: t.lum,
+      date: t.date, dateExif: t.dateExif, group: t.group }));
   },
   delTile(id) { return this.run('tiles', 'readwrite', (s) => s.delete(id)); },
   clearTiles() { return this.run('tiles', 'readwrite', (s) => s.clear()); },
@@ -84,19 +86,86 @@ const idb = {
 };
 
 /* ── Bibliothek ────────────────────────────────────── */
-const lib = [];             // Kacheln: {id,key,size,bmp,blob,feat,rgb,hue,sat,light,lum,file?,demo?}
+const lib = [];             // Kacheln: {id,key,size,bmp,blob,feat,rgb,hue,sat,light,lum,date,dateExif,group,file?,demo?}
 let libVer = 0, featFlat = null, featVer = -1, orderCounter = 0;
+let act = [], poolVer = 0;  // act = Fotos, die nach Zeitraum/Sammlung ins Mosaik kommen
+let groups = [];            // Sammlungen (je Import eine): {id,name,at}
 let target = null, targetVer = 0;   // Hauptbild {bmp,w,h,blob,demo}
 let mask = null, maskVer = 0;       // eigenes Formbild {img,w,h,blob}
 
 function libFeat() {
-  if (featVer !== libVer) {
-    featFlat = new Float32Array(lib.length * E.F);
-    lib.forEach((t, i) => featFlat.set(t.feat, i * E.F));
-    featVer = libVer;
+  if (featVer !== poolVer) {
+    featFlat = new Float32Array(act.length * E.F);
+    act.forEach((t, i) => featFlat.set(t.feat, i * E.F));
+    featVer = poolVer;
   }
   return featFlat;
 }
+
+/* ── Aufnahmedatum aus EXIF (JPEG und HEIC, nur lokal gelesen) ── */
+async function exifDate(file) {
+  try {
+    const buf = new Uint8Array(await file.slice(0, 512 * 1024).arrayBuffer());
+    let t = -1;
+    for (let i = 0; i < buf.length - 10; i++) {
+      if (buf[i] === 0x45 && buf[i + 1] === 0x78 && buf[i + 2] === 0x69 && buf[i + 3] === 0x66 && buf[i + 4] === 0 && buf[i + 5] === 0) { t = i + 6; break; }
+    }
+    if (t < 0) return null;
+    const dv = new DataView(buf.buffer), le = buf[t] === 0x49;
+    const u16 = (o) => dv.getUint16(t + o, le), u32 = (o) => dv.getUint32(t + o, le);
+    if (u16(2) !== 42) return null;
+    const ifd = (off) => {
+      const n = u16(off), e = {};
+      for (let k = 0; k < n && k < 400; k++) { const p = off + 2 + k * 12; e[u16(p)] = { cnt: u32(p + 4), p: p + 8 }; }
+      return e;
+    };
+    const str = (en) => { const o = en.cnt > 4 ? u32(en.p) : en.p; let r = ''; for (let i = 0; i < en.cnt - 1; i++) r += String.fromCharCode(buf[t + o + i]); return r; };
+    const i0 = ifd(u32(4));
+    let en = null;
+    if (i0[0x8769]) { const ex = ifd(u32(i0[0x8769].p)); en = ex[0x9003] || ex[0x9004]; }
+    if (!en) en = i0[0x0132];
+    if (!en) return null;
+    const m = /^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/.exec(str(en));
+    if (!m || m[1] === '0000') return null;
+    const d = new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime();
+    return isNaN(d) ? null : d;
+  } catch (e) { return null; }
+}
+
+/* ── Filter: Zeitraum und Sammlungen ──────────────── */
+const MONTHS = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+const yearOf = (t) => t.date ? new Date(t.date).getFullYear() : null;
+const isoDay = (ms) => { const d = new Date(ms); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const groupOf = (t) => t.group || 'g0';
+function passes(t) {
+  if (t.demo) return true;
+  const f = S.filter;
+  if (f.off.includes(groupOf(t))) return false;
+  if (f.range === 'all') return true;
+  if (!t.date) return false;
+  if (f.range === 'custom') {
+    const a = f.from ? new Date(f.from + 'T00:00:00').getTime() : -Infinity, b = f.to ? new Date(f.to + 'T23:59:59').getTime() : Infinity;
+    return t.date >= a && t.date <= b;
+  }
+  return yearOf(t) === +f.range.slice(2);
+}
+function applyFilter() {
+  act = lib.filter(passes); poolVer++;
+}
+function filterActive() { return S.filter.range !== 'all' || S.filter.off.some((g) => lib.some((t) => groupOf(t) === g)); }
+function groupName(id) { const g = groups.find((x) => x.id === id); return g ? g.name : 'Frühere Auswahl'; }
+function autoGroupName(tiles) {
+  const ds = tiles.filter((t) => t.dateExif).map((t) => t.date).sort((a, b) => a - b);
+  const today = new Date().toLocaleDateString('de-DE');
+  if (ds.length < tiles.length * 0.6 || !ds.length) return `Auswahl vom ${today}`;
+  const a = new Date(ds[0]), b = new Date(ds[ds.length - 1]);
+  if (a.getFullYear() === b.getFullYear()) {
+    if (a.getMonth() === b.getMonth()) return `${MONTHS[a.getMonth()]} ${a.getFullYear()}`;
+    return `${MONTHS[a.getMonth()]} – ${MONTHS[b.getMonth()]} ${a.getFullYear()}`;
+  }
+  return `${a.getFullYear()} – ${b.getFullYear()}`;
+}
+function saveGroups() { idb.setMeta('groups', groups); }
 function thumbURL(t) { if (!t.url && t.blob) t.url = URL.createObjectURL(t.blob); return t.url || ''; }
 
 async function decode(blob) {
@@ -120,11 +189,13 @@ async function tileFromCanvas(c, size, extra) {
   const bmp = await toBitmap(c);
   return { id: uid(), size, bmp, blob, url: null, order: orderCounter++, ...f, ...extra };
 }
-async function tileFromFile(file, size) {
+async function tileFromFile(file, size, group) {
+  const ex = await exifDate(file);
   const d = await decode(file);
   try {
     const { sx, sy, s } = squareOf(d.w, d.h), T = Math.max(16, Math.min(size, Math.round(s)));
-    return await tileFromCanvas(E.resample(d.img, sx, sy, s, s, T, T), T, { file, key: fileKey(file) });
+    return await tileFromCanvas(E.resample(d.img, sx, sy, s, s, T, T), T,
+      { file, key: fileKey(file), group, date: ex || file.lastModified || null, dateExif: !!ex });
   } finally { d.done(); }
 }
 
@@ -139,16 +210,18 @@ async function addFiles(fileList) {
   const size = total <= 200 ? 320 : total <= 500 ? 256 : total <= 1000 ? 192 : 144;
   const P = progressModal('Fotos werden vorbereitet', `${files.length} Fotos werden verkleinert und nach Farben analysiert.`);
   const out = new Array(files.length); let next = 0, done = 0, failed = 0;
+  const gid = 'g' + Date.now().toString(36);
   async function worker() {
     while (next < files.length && !P.cancelled) {
       const i = next++;
-      try { out[i] = await tileFromFile(files[i], size); } catch (e) { failed++; }
+      try { out[i] = await tileFromFile(files[i], size, gid); } catch (e) { failed++; }
       done++; P.set(done / files.length, `${nf(done)} von ${nf(files.length)}`);
     }
   }
   await Promise.all([worker(), worker()]);
   const added = out.filter(Boolean);
   for (const t of added) { lib.push(t); idb.putTile(t); }
+  if (added.length) { groups.push({ id: gid, name: autoGroupName(added), at: Date.now() }); saveGroups(); }
   libVer++;
   P.close();
   if (failed) toast(`${failed} Foto${failed > 1 ? 's' : ''} konnte${failed > 1 ? 'n' : ''} nicht gelesen werden.`);
@@ -168,7 +241,7 @@ function clearLibrary(silent) {
   for (const t of lib) { if (t.url) URL.revokeObjectURL(t.url); if (t.bmp && t.bmp.close) t.bmp.close(); freeMips(t); }
   const wasDemo = lib.length && lib[0].demo;
   lib.length = 0; libVer++;
-  if (!wasDemo) idb.clearTiles();
+  if (!wasDemo) { idb.clearTiles(); groups = []; saveGroups(); S.filter = { ...DEF.filter, off: [] }; save(); }
   if (target && target.demo) { target = null; targetVer++; }
   if (!silent) refresh();
 }
@@ -194,6 +267,7 @@ async function restore() {
     await Promise.all([work(), work(), work(), work()]);
     lib.push(...out.filter(Boolean)); libVer++;
   }
+  groups = (await idb.getMeta('groups')) || [];
   const tb = await idb.getMeta('target');
   if (tb) { try { await setTarget(tb, false, true); } catch (e) {} }
   const mb = await idb.getMeta('mask');
@@ -328,9 +402,10 @@ async function build() {
   emptyMsg = '';
   let tiles, cols, rows, overlay = null;
   if (!lib.length) { L = null; return drawPreview(); }
+  if (!act.length) { L = null; emptyMsg = 'Im gewählten Zeitraum bzw. in den gewählten Sammlungen sind keine Fotos. Ändere unten den Filter bei „Fotos“.'; return drawPreview(); }
 
   if (mode === 'raster') {
-    const n = lib.length, share = [0, 0.12, 0.3][m.big] || 0;
+    const n = act.length, share = [0, 0.12, 0.3][m.big] || 0;
     if (m.autoCols) {
       const area = n / (1 - 0.75 * share);
       if (m.format === 'auto') { cols = Math.max(1, Math.ceil(Math.sqrt(area))); rows = Math.max(1, Math.ceil(area / cols)); }
@@ -340,7 +415,7 @@ async function build() {
       cols = m.cols; rows = Math.max(1, Math.round(cols / (m.format === 'auto' ? 1 : aspectOf(m.format))));
     }
     const cells = E.orderCells(E.rasterCells(cols, rows, share, r), m.sort);
-    const picks = E.orderedPicks(lib, cells.length, m.sort, r);
+    const picks = E.orderedPicks(act, cells.length, m.sort, r);
     tiles = cells.map((c, i) => ({ x: c.x, y: c.y, s: c.s, t: picks[i] }));
     if (cells.length > n) E.spreadDuplicates({ cols, rows, tiles }, r, m.sort !== 'zufall');
   } else if (mode === 'form') {
@@ -352,9 +427,9 @@ async function build() {
     for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) if (cov[y * cols + x] >= 0.5) cells.push({ x, y, s: 1 });
     if (!cells.length) { L = null; emptyMsg = 'Die Form ist bei dieser Kachelzahl zu klein. Erhöhe „Kacheln pro Reihe“.'; return drawPreview(); }
     const ord = E.orderCells(cells, m.sort);
-    const picks = E.orderedPicks(lib, ord.length, m.sort, r);
+    const picks = E.orderedPicks(act, ord.length, m.sort, r);
     tiles = ord.map((c, i) => ({ x: c.x, y: c.y, s: 1, t: picks[i] }));
-    if (ord.length > lib.length) E.spreadDuplicates({ cols, rows, tiles }, r, m.sort !== 'zufall');
+    if (ord.length > act.length) E.spreadDuplicates({ cols, rows, tiles }, r, m.sort !== 'zufall');
   } else {
     if (!target) { L = null; emptyMsg = 'Wähle unten das Hauptbild, das aus deinen Fotos entstehen soll.'; return drawPreview(); }
     const A = m.format === 'auto' ? target.w / target.h : aspectOf(m.format);
@@ -362,10 +437,10 @@ async function build() {
     const crop = E.cropFor(target.w, target.h, cols / rows);
     const tk = [targetVer, cols, rows].join();
     if (cache.tfKey !== tk) { cache.tf = E.targetFeatures(target.bmp, crop, cols, rows); cache.tfKey = tk; }
-    const mk = [tk, libVer, m.variety, m.spacing, S.seed].join();
+    const mk = [tk, poolVer, m.variety, m.spacing, S.seed].join();
     if (cache.mKey !== mk) {
       busy(true, 'Suche passende Fotos …');
-      const res = await E.matchTiles(libFeat(), lib.length, cache.tf, cols, rows,
+      const res = await E.matchTiles(libFeat(), act.length, cache.tf, cols, rows,
         { variety: m.variety, spacing: m.spacing, seed: S.seed },
         async (p) => { if (tok !== buildTok) return false; busy(true, `Suche passende Fotos … ${Math.round(p * 100)} %`); await frame(); return tok === buildTok; });
       if (!res || tok !== buildTok) return;
@@ -402,7 +477,7 @@ function mip(t, px) {
   return m[lvl];
 }
 function freeMips(t) { if (t.mips) { Object.values(t.mips).forEach(E.free); t.mips = null; } }
-const thumb = (t, px) => mip(lib[t], px);
+const thumb = (t, px) => mip(act[t], px);
 function drawPreview() {
   const cv = $('#pv'), st = $('#stage'), em = $('#pvEmpty');
   busy(false);
@@ -430,7 +505,7 @@ function infoText() {
   const used = new Set(L.tiles.map((t) => t.t)).size, n = L.tiles.length;
   if (S.mode === 'raster') {
     const rep = n - used;
-    return `${L.cols} × ${L.rows} Felder · ${nf(used)} Fotos` + (rep > 0 ? ` · ${nf(rep)} doppelt` : lib.length > n ? ` · ${nf(lib.length - n)} nicht genutzt` : '');
+    return `${L.cols} × ${L.rows} Felder · ${nf(used)} Fotos` + (rep > 0 ? ` · ${nf(rep)} doppelt` : act.length > n ? ` · ${nf(act.length - n)} nicht genutzt` : '');
   }
   if (S.mode === 'form') return `${nf(n)} Kacheln in der Form · ${nf(used)} verschiedene Fotos` + (n > used ? ` · je ca. ${nf(n / used, 1)}×` : '');
   return `${L.cols} × ${L.rows} = ${nf(n)} Kacheln · ${nf(used)} verschiedene Fotos`;
@@ -453,8 +528,8 @@ function updateOut() {
   const cm = (px) => nf(px / 300 * 2.54, 0);
   let t = `Druckgröße bei 300 dpi: ${cm(g.W)} × ${cm(g.H)} cm · Kachel ${nf(g.cellPx)} px.`;
   const need = g.cellPx * L.tiles.reduce((a, x) => Math.max(a, x.s), 1);
-  const small = lib.filter((x) => !x.demo && !x.file && x.size < need * 0.8).length;
-  if (small) t += ` Hinweis: ${small} Fotos stammen aus einer früheren Sitzung und liegen nur in ${lib.find((x) => !x.file).size} px vor. Für volle Schärfe Fotos neu hinzufügen.`;
+  const small = act.filter((x) => !x.demo && !x.file && x.size < need * 0.8).length;
+  if (small) t += ` Hinweis: ${small} Fotos stammen aus einer früheren Sitzung und liegen nur in ${act.find((x) => !x.file).size} px vor. Für volle Schärfe Fotos neu hinzufügen.`;
   note.textContent = t;
 }
 
@@ -559,7 +634,7 @@ function buildModeUI() {
     g.append(slider('Farben angleichen', { min: 0, max: 0.8, step: 0.02, get: () => m.color, set: (v) => { m.color = v; if (L && L.overlay) L.overlay.color = v; }, fmt: pct, sub: 'Färbt die Fotos leicht im Farbton des Hauptbilds' }));
     g.append(slider('Hauptbild einblenden', { min: 0, max: 0.6, step: 0.02, get: () => m.alpha, set: (v) => { m.alpha = v; if (L && L.overlay) L.overlay.alpha = v; }, fmt: pct, sub: 'Legt das Hauptbild durchscheinend über die Kacheln' }));
     g.append(link('Neu mischen', reshuffle, h('span', { class: 'chev' }, '⟳')));
-    if (lib.length < 80) note.append(h('p', { class: 'note warn' }, `Tipp: Du hast ${lib.length} Fotos. Mit 150 oder mehr Fotos wird das Hauptbild deutlich besser erkennbar.`));
+    if (act.length < 80) note.append(h('p', { class: 'note warn' }, `Tipp: Es sind ${act.length} Fotos ausgewählt. Mit 150 oder mehr Fotos wird das Hauptbild deutlich besser erkennbar.`));
   }
 }
 function thumbURLTarget() { if (!target.url) target.url = URL.createObjectURL(target.blob); return target.url; }
@@ -590,13 +665,61 @@ function buildLookUI() {
   g.append(h('div', { class: 'row' }, h('span', { class: 'rl' }, 'Hintergrund'), sw));
 }
 
+function filterChanged() { save(); applyFilter(); buildPhotosUI(); buildModeUI(); schedule(0); }
 function buildPhotosUI() {
-  const g = $('#gPhotos'); g.textContent = '';
-  const strip = h('div', { class: 'strip' }, lib.slice(0, 14).map((t) => h('img', { src: thumbURL(t), alt: '' })));
+  const g = $('#gPhotos'), F = S.filter; g.textContent = '';
+  const note = $('#photosNote'); note.textContent = '';
+  const strip = h('div', { class: 'strip' }, act.slice(0, 14).map((t) => h('img', { src: thumbURL(t), alt: '' })));
   const demo = lib.length && lib[0].demo;
+  const label = demo ? `${nf(lib.length)} Beispielfotos` : filterActive() ? `${nf(act.length)} von ${nf(lib.length)} Fotos im Mosaik` : `${nf(lib.length)} Fotos`;
   g.append(h('div', { class: 'row link', onclick: () => openLibrary(false) },
-    h('div', { class: 'rl' }, h('div', null, `${nf(lib.length)} ${demo ? 'Beispielfotos' : 'Fotos'}`), strip), h('span', { class: 'chev' }, '›')));
+    h('div', { class: 'rl' }, h('div', null, label), strip), h('span', { class: 'chev' }, '›')));
+
+  if (!demo) {
+    // Zeitraum
+    const years = new Map();
+    for (const t of lib) { const y = yearOf(t); if (y) years.set(y, (years.get(y) || 0) + 1); }
+    const opts = [['all', `Alle Fotos (${nf(lib.length)})`]];
+    [...years.keys()].sort((a, b) => b - a).forEach((y) => opts.push(['y:' + y, `${y} (${nf(years.get(y))})`]));
+    opts.push(['custom', 'Eigener Zeitraum …']);
+    if (F.range.startsWith('y:') && !years.has(+F.range.slice(2))) F.range = 'all';
+    const sel = h('select', { 'aria-label': 'Zeitraum', onchange: () => {
+      F.range = sel.value;
+      if (F.range === 'custom' && !F.from) {
+        const ds = lib.filter((t) => t.date).map((t) => t.date);
+        if (ds.length) { F.from = isoDay(Math.min(...ds)); F.to = isoDay(Math.max(...ds)); }
+      }
+      filterChanged();
+    } }, opts.map(([v, t]) => h('option', { value: v }, t)));
+    sel.value = F.range;
+    g.append(h('div', { class: 'row' }, h('span', { class: 'rl' }, 'Zeitraum'), sel));
+    if (F.range === 'custom') {
+      const mk = (k, lab) => {
+        const i = h('input', { type: 'date', value: F[k], 'aria-label': lab, onchange: () => { F[k] = i.value; filterChanged(); } });
+        return h('label', { class: 'date' }, h('span', null, lab), i);
+      };
+      g.append(h('div', { class: 'row dates' }, mk('from', 'Von'), mk('to', 'Bis')));
+    }
+    // Sammlungen (je Import / Album eine)
+    const counts = new Map();
+    for (const t of lib) counts.set(groupOf(t), (counts.get(groupOf(t)) || 0) + 1);
+    const ids = [...counts.keys()].sort((a, b) => (groups.find((x) => x.id === b)?.at || 0) - (groups.find((x) => x.id === a)?.at || 0));
+    if (ids.length > 1) {
+      const chips = h('div', { class: 'chips' });
+      for (const id of ids) {
+        const on = !F.off.includes(id);
+        chips.append(h('button', { class: on ? 'on' : '', onclick: () => {
+          F.off = on ? [...F.off, id] : F.off.filter((x) => x !== id); filterChanged();
+        } }, h('span', null, on ? '✓ ' : ''), groupName(id), h('small', null, ' ' + nf(counts.get(id)))));
+      }
+      g.append(h('div', { class: 'row col' }, h('div', { class: 'top' }, h('span', { class: 'rl' }, 'Sammlungen'), h('span', { class: 'rv' }, 'je Auswahl eine')), chips));
+    }
+    const noDate = lib.filter((t) => !t.dateExif).length;
+    if (F.range !== 'all' && noDate) note.append(h('p', { class: 'note' }, `${nf(noDate)} Fotos haben kein Aufnahmedatum in den Bilddaten. Für sie gilt das Dateidatum.`));
+    if (!act.length) note.append(h('p', { class: 'note warn' }, 'Mit diesem Filter ist kein Foto ausgewählt.'));
+  }
   g.append(link(demo ? 'Eigene Fotos auswählen …' : 'Fotos hinzufügen …', () => $('#inPhotos').click(), h('span', { class: 'chev' }, '＋')));
+  note.append(h('p', { class: 'note' }, 'Tipp: In der Fotoauswahl oben auf „Alben“ tippen, um ein ganzes Album zu öffnen. Mit dem Finger über die Fotos wischen markiert viele auf einmal. Jede Auswahl wird hier als eigene Sammlung gemerkt.'));
   $('#libBtn').textContent = `${nf(lib.length)} Fotos`;
 }
 
@@ -610,6 +733,7 @@ function refresh() {
   const has = lib.length > 0;
   $('#welcome').hidden = has; $('#work').hidden = !has; $('#libBtn').hidden = !has;
   if (!has) { drawHero(); return; }
+  applyFilter();
   buildModeUI(); buildLookUI(); buildPhotosUI(); buildOutUI();
   schedule(0);
 }
@@ -627,16 +751,46 @@ function sheet(title, left, right, body, foot) {
   return { close, bd };
 }
 function openLibrary(pickMode) {
-  const grid = h('div', { class: 'libgrid' });
+  const grid = h('div');
   let changed = false;
-  for (const t of lib) {
-    const cell = h('div', null, h('img', { src: thumbURL(t), alt: '', loading: 'lazy' }));
+  if (!pickMode && !(lib[0] && lib[0].demo)) {
+    const counts = new Map();
+    for (const t of lib) counts.set(groupOf(t), (counts.get(groupOf(t)) || 0) + 1);
+    const gl = h('div', { class: 'group', style: 'margin-bottom:16px' });
+    for (const [id, n] of counts) {
+      const name = h('span', null, groupName(id));
+      gl.append(h('div', { class: 'row' },
+        h('div', { class: 'rl' }, name, h('div', { class: 'sub' }, `${nf(n)} Fotos${S.filter.off.includes(id) ? ' · nicht im Mosaik' : ''}`)),
+        h('button', { class: 'mini', onclick: () => {
+          const v = prompt('Name der Sammlung', name.textContent); if (!v) return;
+          let g = groups.find((x) => x.id === id); if (!g) groups.push(g = { id, at: 0, name: v }); g.name = v.trim().slice(0, 40);
+          name.textContent = g.name; saveGroups(); changed = true;
+        } }, 'Umbenennen'),
+        h('button', { class: 'mini bad', onclick: () => {
+          if (!confirm(`Sammlung „${groupName(id)}“ mit ${n} Fotos aus dem Mosaik entfernen? Die Originale bleiben in deiner Galerie.`)) return;
+          lib.filter((t) => groupOf(t) === id).forEach(removeTile);
+          groups = groups.filter((x) => x.id !== id); saveGroups(); s.close(); refresh();
+        } }, 'Entfernen')));
+    }
+    grid.append(h('h4', { class: 'gh', style: 'margin-top:4px' }, 'Sammlungen'), gl);
+  }
+  // Fotos nach Monat gruppiert, neueste zuerst
+  const sorted = lib.slice().sort((a, b) => (b.date || 0) - (a.date || 0));
+  let cur = null, box = null;
+  for (const t of sorted) {
+    const key = t.demo ? 'demo' : t.date ? (() => { const d = new Date(t.date); return MONTHS[d.getMonth()] + ' ' + d.getFullYear(); })() : 'Ohne Datum';
+    if (key !== cur) {
+      cur = key; box = h('div', { class: 'libgrid' });
+      if (key !== 'demo') grid.append(h('h4', { class: 'gh' }, key));
+      grid.append(box);
+    }
+    const cell = h('div', { class: passes(t) ? '' : 'off' }, h('img', { src: thumbURL(t), alt: '', loading: 'lazy' }));
     if (pickMode) cell.addEventListener('click', async () => {
       s.close(); toast('Hauptbild wird geladen …');
       await setTarget(t.file || t.blob, false); buildModeUI(); schedule(0);
     });
     else cell.append(h('button', { 'aria-label': 'Entfernen', onclick: () => { removeTile(t); cell.remove(); changed = true; } }, '✕'));
-    grid.append(cell);
+    box.append(cell);
   }
   const foot = pickMode ? null : h('div', { style: 'margin-top:18px' },
     h('button', { class: 'btn', style: 'color:var(--bad)', onclick: () => { if (confirm('Alle Fotos aus dem Mosaik entfernen? Die Originale in deiner Galerie bleiben erhalten.')) { s.close(); clearLibrary(false); } } }, 'Alle entfernen'));
@@ -683,15 +837,16 @@ async function exportMosaic() {
     // 1) Fotos bei Bedarf in höherer Auflösung laden
     const span = Lx.tiles.reduce((a, t) => Math.max(a, t.s), 1), need = geo.cellPx * span;
     const used = [...new Set(Lx.tiles.map((t) => t.t))];
-    const cand = used.filter((t) => lib[t].file && lib[t].size < need * 0.9);
+    const pool = act;
+    const cand = used.filter((t) => pool[t].file && pool[t].size < need * 0.9);
     if (cand.length) {
       const px = Math.min(need, 2400, Math.floor(Math.sqrt(200e6 / 4 / cand.length)));
-      const todo = cand.filter((t) => px > lib[t].size * 1.15);
+      const todo = cand.filter((t) => px > pool[t].size * 1.15);
       let next = 0, done = 0;
       const work = async () => {
         while (next < todo.length && !P.cancelled) {
           const t = todo[next++];
-          try { hires.set(t, await makeHires(lib[t].file, px)); } catch (e) {}
+          try { hires.set(t, await makeHires(pool[t].file, px)); } catch (e) {}
           done++; P.set(0.25 * done / todo.length, `Fotos in voller Auflösung: ${done} von ${todo.length}`);
         }
       };
@@ -699,7 +854,7 @@ async function exportMosaic() {
     }
     if (P.cancelled) throw new Error('abort');
     const base = hires.size ? 0.25 : 0;
-    const getImg = (t, px) => hires.get(t) || mip(lib[t], px);
+    const getImg = (t, px) => hires.get(t) || mip(pool[t], px);
 
     // 2) Streifenweise rendern und im Worker als JPEG kodieren
     worker = new Worker('jpeg-worker.js');
@@ -773,7 +928,7 @@ function vFit() {
   V.fit = Math.min(cv.width / pvGeo.W, cv.height / pvGeo.H) * 0.94;
   V.s = V.fit; V.tx = (cv.width - pvGeo.W * V.s) / 2; V.ty = (cv.height - pvGeo.H * V.s) / 2;
 }
-function vMax() { const big = Math.max(...lib.slice(0, 50).map((t) => t.size)); return Math.max(V.fit * 2, big * 1.6 / pvGeo.cellPx); }
+function vMax() { const big = Math.max(64, ...act.slice(0, 50).map((t) => t.size)); return Math.max(V.fit * 2, big * 1.6 / pvGeo.cellPx); }
 function vClamp() {
   const cv = $('#viewer canvas'), W = pvGeo.W * V.s, H = pvGeo.H * V.s, m = 0.4;
   V.tx = W < cv.width ? (cv.width - W) / 2 : Math.min(cv.width * m, Math.max(cv.width * (1 - m) - W, V.tx));
