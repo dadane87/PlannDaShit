@@ -168,18 +168,25 @@ function autoGroupName(tiles) {
 function saveGroups() { idb.setMeta('groups', groups); }
 function thumbURL(t) { if (!t.url && t.blob) t.url = URL.createObjectURL(t.blob); return t.url || ''; }
 
-async function decode(blob) {
-  const url = URL.createObjectURL(blob), img = new Image();
-  img.decoding = 'async'; img.src = url;
-  try { await img.decode(); } catch (e) {
-    await new Promise((res, rej) => {
-      if (img.complete && img.naturalWidth) return res();
-      img.onload = res; img.onerror = () => rej(new Error('Bild nicht lesbar'));
-    });
-  }
-  if (!img.naturalWidth) { URL.revokeObjectURL(url); throw new Error('Bild nicht lesbar'); }
-  return { img, w: img.naturalWidth, h: img.naturalHeight, done() { URL.revokeObjectURL(url); img.src = ''; } };
+// Bild lesen. Handler werden vor dem Laden gesetzt und es gibt ein Zeitlimit,
+// damit ein einzelnes problematisches Foto den Import nie blockiert.
+function decode(blob, ms = 25000) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(blob), img = new Image();
+    let fin = false;
+    const end = (err) => {
+      if (fin) return; fin = true; clearTimeout(timer);
+      if (err) { img.onload = img.onerror = null; img.src = ''; URL.revokeObjectURL(url); reject(err); return; }
+      resolve({ img, w: img.naturalWidth, h: img.naturalHeight, done() { img.src = ''; URL.revokeObjectURL(url); } });
+    };
+    const timer = setTimeout(() => end(new Error('Zeitüberschreitung beim Lesen')), ms);
+    img.onload = () => (img.naturalWidth ? end() : end(new Error('Bild ist leer')));
+    img.onerror = () => end(new Error('Format nicht lesbar'));
+    img.decoding = 'async';
+    img.src = url;
+  });
 }
+const withTimeout = (p, ms, msg) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error(msg)), ms))]);
 function squareOf(w, hh) { const s = Math.min(w, hh); return { sx: (w - s) / 2, sy: hh > w ? (hh - s) * 0.38 : (hh - s) / 2, s }; }
 async function toBitmap(c) { try { const b = await createImageBitmap(c); E.free(c); return b; } catch (e) { return c; } }
 
@@ -190,13 +197,21 @@ async function tileFromCanvas(c, size, extra) {
   return { id: uid(), size, bmp, blob, url: null, order: orderCounter++, ...f, ...extra };
 }
 async function tileFromFile(file, size, group) {
-  const ex = await exifDate(file);
+  const ex = await withTimeout(exifDate(file), 8000, 'EXIF').catch(() => null);
   const d = await decode(file);
+  let c, T;
   try {
-    const { sx, sy, s } = squareOf(d.w, d.h), T = Math.max(16, Math.min(size, Math.round(s)));
-    return await tileFromCanvas(E.resample(d.img, sx, sy, s, s, T, T), T,
-      { file, key: fileKey(file), group, date: ex || file.lastModified || null, dateExif: !!ex });
+    const sq = squareOf(d.w, d.h);
+    T = Math.max(16, Math.min(size, Math.round(sq.s)));
+    // Großes Foto sofort auf höchstens 4× Kachelgröße bringen, danach ist das Original frei
+    const M = Math.min(Math.round(sq.s), T * 4);
+    c = E.canvas(M, M);
+    const x = E.ctx2d(c); if (!x) throw new Error('Kein Speicher für Zeichenfläche');
+    x.drawImage(d.img, sq.sx, sq.sy, sq.s, sq.s, 0, 0, M, M);
   } finally { d.done(); }
+  const small = E.resample(c, 0, 0, c.width, c.height, T, T); E.free(c);
+  return await tileFromCanvas(small, T,
+    { file, key: fileKey(file), group, date: ex || file.lastModified || null, dateExif: !!ex });
 }
 
 async function addFiles(fileList) {
@@ -208,23 +223,35 @@ async function addFiles(fileList) {
   if (!files.length) { toast('Diese Fotos sind schon dabei.'); return; }
   const total = lib.length + files.length;
   const size = total <= 200 ? 320 : total <= 500 ? 256 : total <= 1000 ? 192 : 144;
-  const P = progressModal('Fotos werden vorbereitet', `${files.length} Fotos werden verkleinert und nach Farben analysiert.`);
-  const out = new Array(files.length); let next = 0, done = 0, failed = 0;
-  const gid = 'g' + Date.now().toString(36);
+  const P = progressModal('Fotos werden vorbereitet', `${nf(files.length)} Fotos werden verkleinert und nach Farben analysiert. Jedes fertige Foto wird sofort gespeichert.`);
+  P.set(0, `Foto 1 von ${nf(files.length)} …`);
+  await frame(); await frame();
+  const gid = 'g' + Date.now().toString(36), added = [];
+  groups.push({ id: gid, name: 'Neue Auswahl', at: Date.now() }); saveGroups();
+  let failed = 0, firstErr = '';
+  // Nacheinander: auf dem iPhone ist der Speicher knapp, große Fotos parallel zu öffnen kann Safari abstürzen lassen
+  const par = /iPhone|iPad|iPod/.test(navigator.userAgent) || navigator.maxTouchPoints > 1 ? 1 : 2;
+  let next = 0, done = 0;
   async function worker() {
     while (next < files.length && !P.cancelled) {
       const i = next++;
-      try { out[i] = await tileFromFile(files[i], size, gid); } catch (e) { failed++; }
-      done++; P.set(done / files.length, `${nf(done)} von ${nf(files.length)}`);
+      try {
+        const t = await withTimeout(tileFromFile(files[i], size, gid), 40000, 'Zeitüberschreitung');
+        added.push(t); lib.push(t); idb.putTile(t);
+      } catch (e) { failed++; if (!firstErr) firstErr = (e && e.message) || String(e); }
+      done++;
+      P.set(done / files.length, `${nf(done)} von ${nf(files.length)}` + (failed ? ` · ${failed} nicht lesbar` : ''));
+      await frame();
     }
   }
-  await Promise.all([worker(), worker()]);
-  const added = out.filter(Boolean);
-  for (const t of added) { lib.push(t); idb.putTile(t); }
-  if (added.length) { groups.push({ id: gid, name: autoGroupName(added), at: Date.now() }); saveGroups(); }
+  await Promise.all(Array.from({ length: par }, worker));
+  lib.sort((a, b) => a.order - b.order);
+  const g = groups.find((x) => x.id === gid);
+  if (added.length) g.name = autoGroupName(added); else groups = groups.filter((x) => x !== g);
+  saveGroups();
   libVer++;
   P.close();
-  if (failed) toast(`${failed} Foto${failed > 1 ? 's' : ''} konnte${failed > 1 ? 'n' : ''} nicht gelesen werden.`);
+  if (failed) toast(`${failed} Foto${failed > 1 ? 's' : ''} nicht lesbar (${firstErr}). ${added.length} übernommen.`, 5000);
   else if (P.cancelled) toast(`Abgebrochen. ${added.length} Fotos übernommen.`);
   refresh();
 }
@@ -718,7 +745,7 @@ function buildPhotosUI() {
     if (F.range !== 'all' && noDate) note.append(h('p', { class: 'note' }, `${nf(noDate)} Fotos haben kein Aufnahmedatum in den Bilddaten. Für sie gilt das Dateidatum.`));
     if (!act.length) note.append(h('p', { class: 'note warn' }, 'Mit diesem Filter ist kein Foto ausgewählt.'));
   }
-  g.append(link(demo ? 'Eigene Fotos auswählen …' : 'Fotos hinzufügen …', () => $('#inPhotos').click(), h('span', { class: 'chev' }, '＋')));
+  g.append(link(demo ? 'Eigene Fotos auswählen …' : 'Fotos hinzufügen …', pickPhotos, h('span', { class: 'chev' }, '＋')));
   note.append(h('p', { class: 'note' }, 'Tipp: In der Fotoauswahl oben auf „Alben“ tippen, um ein ganzes Album zu öffnen. Mit dem Finger über die Fotos wischen markiert viele auf einmal. Jede Auswahl wird hier als eigene Sammlung gemerkt.'));
   $('#libBtn').textContent = `${nf(lib.length)} Fotos`;
 }
@@ -1027,8 +1054,31 @@ function drawHero() {
 }
 
 /* ── Start ─────────────────────────────────────────── */
+// Nach dem Schließen der Fotoauswahl braucht iOS manchmal lange (HEIC umwandeln, Originale aus iCloud laden),
+// bevor die App die Fotos bekommt. In der Zeit zeigen wir einen Hinweis statt eines leeren Bildschirms.
+let waitBox = null, waitT = 0;
+function pickPhotos() {
+  const inp = $('#inPhotos');
+  const arm = () => {
+    window.removeEventListener('focus', arm); document.removeEventListener('visibilitychange', vis);
+    clearTimeout(waitT);
+    waitT = setTimeout(() => {
+      if (waitBox) return;
+      waitBox = progressModal('Fotos werden übergeben …',
+        'iOS bereitet die ausgewählten Fotos vor. Bei vielen Fotos oder Fotos aus iCloud kann das etwas dauern.');
+      waitBox.box.querySelector('.track i').classList.add('indet');
+      waitBox.box.querySelector('.btn').onclick = hideWait;
+    }, 700);
+  };
+  const vis = () => { if (!document.hidden) arm(); };
+  window.addEventListener('focus', arm); document.addEventListener('visibilitychange', vis);
+  inp.click();
+}
+function hideWait() { clearTimeout(waitT); if (waitBox) { waitBox.close(); waitBox = null; } }
+
 function wire() {
-  $('#inPhotos').addEventListener('change', (e) => { const f = e.target.files; if (f && f.length) addFiles(f); e.target.value = ''; });
+  $('#inPhotos').addEventListener('change', (e) => { hideWait(); const f = e.target.files; if (f && f.length) addFiles(f); e.target.value = ''; });
+  $('#inPhotos').addEventListener('cancel', hideWait);
   $('#inTarget').addEventListener('change', async (e) => {
     const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
     try { await setTarget(f, false); buildModeUI(); schedule(0); } catch (err) { toast('Das Bild konnte nicht gelesen werden.'); }
@@ -1037,7 +1087,7 @@ function wire() {
     const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
     try { await setMask(f); S.form.shape = 'bild'; save(); buildModeUI(); schedule(0); } catch (err) { toast('Das Bild konnte nicht gelesen werden.'); }
   });
-  $('#pickFirst').addEventListener('click', () => $('#inPhotos').click());
+  $('#pickFirst').addEventListener('click', pickPhotos);
   $('#demoBtn').addEventListener('click', loadDemo);
   $('#libBtn').addEventListener('click', () => openLibrary(false));
   $('#modeSeg').addEventListener('click', (e) => {
