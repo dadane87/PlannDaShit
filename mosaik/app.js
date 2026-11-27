@@ -1,5 +1,6 @@
 import * as E from './engine.js';
 import { SHAPES, textShape, imageMask } from './shapes.js';
+import * as F from './flip.js';
 
 /* ── Hilfen ─────────────────────────────────────────── */
 const $ = (s, r = document) => r.querySelector(s);
@@ -37,13 +38,14 @@ const DEF = {
   filter: { range: 'all', from: '', to: '', off: [] },
   raster: { format: 'auto', autoCols: true, cols: 8, sort: 'zufall', big: 0, gap: 0.04, radius: 0, bg: '#ffffff' },
   form: { format: 'auto', shape: 'herz', text: 'LOVE', cols: 36, sort: 'zufall', threshold: 0.5, invert: false, gap: 0.06, radius: 0.12, bg: '#ffffff' },
+  flip: { order: 'datum', fps: 8, format: '4:5', fit: 'fill', fade: false, date: true, loops: 1, bg: '#000000', out: 'video', vres: 1080 },
   haupt: { format: 'auto', cols: 60, variety: 0.5, spacing: 2, color: 0.3, alpha: 0.12, gap: 0, radius: 0, bg: '#ffffff' },
 };
 function loadSettings() {
   let s = {};
   try { s = JSON.parse(localStorage.getItem('mosaik-settings') || '{}'); } catch (e) {}
   const o = { ...DEF, ...s };
-  for (const m of ['raster', 'form', 'haupt', 'filter']) o[m] = { ...DEF[m], ...(s[m] || {}) };
+  for (const m of ['raster', 'form', 'haupt', 'flip', 'filter']) o[m] = { ...DEF[m], ...(s[m] || {}) };
   return o;
 }
 const S = loadSettings();
@@ -424,6 +426,8 @@ function schedule(delay) {
 }
 
 async function build() {
+  if (S.mode === 'flip') { L = null; return flipStart(); }
+  flipStop();
   const tok = ++buildTok, mode = S.mode, m = S[mode];
   const r = E.rng(S.seed * 7919 + mode.length);
   emptyMsg = '';
@@ -547,6 +551,24 @@ function outGeo() {
 function updateOut() {
   const f = $('#outFacts'), note = $('#outNote'), go = $('#goBtn');
   if (!f) return;
+  if (S.mode === 'flip') {
+    const m = S.flip, n = act.length;
+    go.disabled = !n;
+    if (m.out === 'video') {
+      const { W, H } = flipVideoSize(), sec = n * m.loops / m.fps;
+      go.textContent = 'Video erstellen';
+      f.innerHTML = `<b>${nf(n)} Bilder</b> · ${nf(sec, sec < 10 ? 1 : 0)} s · ${W} × ${H}`;
+      note.textContent = F.videoMime() ? 'Das Video wird in Echtzeit aufgenommen. Bitte die App so lange geöffnet lassen. Danach im Teilen-Menü „Video sichern“ wählen.'
+        : 'Hinweis: Dieser Browser kann keine Videos aufnehmen. Bitte „Zum Ausdrucken“ wählen oder Safari ab iOS 14.5 verwenden.';
+    } else {
+      const pages = Math.ceil(n / F.PER_PAGE);
+      go.textContent = 'PDF erstellen';
+      f.innerHTML = `<b>${nf(pages)} Seite${pages === 1 ? '' : 'n'} A4</b> · ${nf(n)} Karten`;
+      note.textContent = 'Je Seite 12 nummerierte Karten (10 × 4,6 cm) mit Bindestreifen. In Originalgröße drucken, ausschneiden, nach Nummern stapeln und links klammern. Für ein flüssiges Daumenkino sind 40 oder mehr Bilder ideal.';
+    }
+    return;
+  }
+  go.textContent = 'Mosaik erstellen';
   const g = outGeo();
   go.disabled = !g;
   if (!g) { f.textContent = '–'; note.textContent = ''; return; }
@@ -598,6 +620,7 @@ const pct = (v) => Math.round(v * 100) + ' %';
 const DESC = {
   raster: 'Deine Fotos als klassisches Mosaik-Raster, zufällig verteilt, als Farbverlauf oder nach Helligkeit sortiert.',
   form: 'Die Fotos füllen eine Form: Herz, Stern, Text, Zahl oder ein eigenes Bild als Umriss.',
+  flip: 'Deine Fotos schnell hintereinander wie in einem Daumenkino. Als Video für die Fotos-App oder als PDF zum Ausdrucken, Ausschneiden und Binden.',
   haupt: 'Aus vielen kleinen Fotos entsteht ein großes Bild. Für jede Kachel wird das Foto mit den passendsten Farben gewählt.',
 };
 
@@ -614,6 +637,16 @@ function buildModeUI() {
   [...$('#modeSeg').children].forEach((b) => b.classList.toggle('on', b.dataset.m === S.mode));
   const sorts = [['zufall', 'Zufall'], ['farbe', 'Farbverlauf'], ['hell', 'Hell → Dunkel']];
 
+  if (S.mode === 'flip') {
+    g.append(segment('Reihenfolge', [['datum', 'Datum'], ['auswahl', 'Auswahl'], ['farbe', 'Farbe'], ['zufall', 'Zufall']], () => m.order, (v) => m.order = v));
+    g.append(slider('Tempo', { min: 1, max: 24, get: () => m.fps, set: (v) => m.fps = v, fmt: (v) => `${v} Bild${v > 1 ? 'er' : ''}/s`, sub: 'Für ein echtes Daumenkino-Gefühl 8–12 Bilder pro Sekunde' }));
+    g.append(segment('Bildausschnitt', [['fill', 'Füllen'], ['ganz', 'Ganzes Foto']], () => m.fit, (v) => m.fit = v));
+    g.append(toggle('Überblenden', () => m.fade, (v) => m.fade = v, 'Weicher Übergang statt hartem Schnitt'));
+    g.append(toggle('Datum einblenden', () => m.date, (v) => m.date = v, 'Aufnahmedatum unten rechts'));
+    if (m.order === 'zufall') g.append(link('Neu mischen', reshuffle, h('span', { class: 'chev' }, '⟳')));
+    if (act.some((t) => !t.file && !t.demo)) note.append(h('p', { class: 'note' }, 'Einige Fotos stammen aus einer früheren Sitzung und liegen nur als kleine, quadratische Vorschau vor. Für volle Qualität diese Fotos neu hinzufügen.'));
+    return;
+  }
   if (S.mode === 'raster') {
     g.append(segment('Anordnung', [...sorts, ['auswahl', 'Auswahl']], () => m.sort, (v) => m.sort = v));
     const auto = toggle('Spalten automatisch', () => m.autoCols, (v) => m.autoCols = v, 'So viele Felder wie Fotos');
@@ -677,11 +710,12 @@ function shapeIcon(s) {
 }
 
 function buildLookUI() {
-  const g = $('#gLook'), m = S[S.mode];
+  const g = $('#gLook'), m = S[S.mode], flip = S.mode === 'flip';
   g.textContent = '';
-  g.append(select('Format', FORMATS, () => m.format, (v) => m.format = v));
-  g.append(slider('Fugen', { min: 0, max: 0.3, step: 0.01, get: () => m.gap, set: (v) => m.gap = v, fmt: (v) => v ? pct(v) : 'keine' }));
-  g.append(slider('Ecken', { min: 0, max: 0.5, step: 0.01, get: () => m.radius, set: (v) => m.radius = v, fmt: (v) => v === 0 ? 'eckig' : v >= 0.5 ? 'rund' : pct(v * 2) }));
+  if (flip) { if (!F.FLIP_FORMATS.some(([v]) => v === m.format)) m.format = '4:5'; }
+  g.append(select('Format', flip ? F.FLIP_FORMATS : FORMATS, () => m.format, (v) => m.format = v));
+  if (!flip) g.append(slider('Fugen', { min: 0, max: 0.3, step: 0.01, get: () => m.gap, set: (v) => m.gap = v, fmt: (v) => v ? pct(v) : 'keine' }));
+  if (!flip) g.append(slider('Ecken', { min: 0, max: 0.5, step: 0.01, get: () => m.radius, set: (v) => m.radius = v, fmt: (v) => v === 0 ? 'eckig' : v >= 0.5 ? 'rund' : pct(v * 2) }));
   const sw = h('div', { class: 'swatches' });
   const paint = () => [...sw.children].forEach((b) => b.classList.toggle('on', b.dataset.c === m.bg || (b.tagName === 'LABEL' && !BGS.includes(m.bg))));
   for (const c of BGS) sw.append(h('button', { 'data-c': c, style: `background:${c}`, 'aria-label': c, onclick: () => { m.bg = c; paint(); save(); schedule(); } }));
@@ -752,6 +786,17 @@ function buildPhotosUI() {
 
 function buildOutUI() {
   const g = $('#gOut'); g.textContent = '';
+  if (S.mode === 'flip') {
+    const m = S.flip;
+    g.append(segment('Ergebnis', [['video', 'Video'], ['druck', 'Zum Ausdrucken']], () => m.out, (v) => { m.out = v; buildOutUI(); }));
+    if (m.out === 'video') {
+      g.append(segment('Videoqualität', [[720, '720p'], [1080, '1080p']], () => m.vres, (v) => { m.vres = +v; updateOut(); }));
+      g.append(slider('Durchläufe', { min: 1, max: 5, get: () => m.loops, set: (v) => { m.loops = v; updateOut(); }, fmt: (v) => v === 1 ? 'einmal' : v + '×' }));
+    }
+    g.append(h('div', { class: 'row' }, h('span', { class: 'rl' }, 'Umfang'), h('span', { class: 'rv', id: 'outFacts' }, '–')));
+    updateOut();
+    return;
+  }
   g.append(segment('Auflösung (lange Seite)', RES, () => S.res, (v) => { S.res = +v; updateOut(); }));
   g.append(h('div', { class: 'row' }, h('span', { class: 'rl' }, 'Ergebnis'), h('span', { class: 'rv', id: 'outFacts' }, '–')));
 }
@@ -937,6 +982,188 @@ function showResult(blob, geo, mode) {
   bd.append(box); document.body.append(bd); document.body.classList.add('locked');
 }
 
+/* ── Daumenkino ────────────────────────────────────── */
+const FL = { frames: [], playing: true, k: -1, t0: 0, raf: 0, cache: new Map(), loading: new Set(), W: 0, H: 0, style: '' };
+function flipFrames() { return F.orderFrames(act, S.flip.order, E.rng(S.seed * 31 + 7)); }
+function flipVideoSize() {
+  const A = aspectOf(S.flip.format), s = S.flip.vres, ev = (v) => Math.round(v / 2) * 2;
+  return A >= 1 ? { W: ev(s * A), H: s } : { W: s, H: ev(s / A) };
+}
+// Foto für das Daumenkino laden: aus dem Original (diese Sitzung) mit Seitenverhältnis, sonst die Vorschau
+async function loadSource(t, maxSide) {
+  if (t.file) {
+    try {
+      const d = await decode(t.file);
+      try {
+        const k = Math.min(1, maxSide / Math.max(d.w, d.h)), w = Math.max(1, Math.round(d.w * k)), hh = Math.max(1, Math.round(d.h * k));
+        return { img: E.resample(d.img, 0, 0, d.w, d.h, w, hh), w, h: hh, own: true };
+      } finally { d.done(); }
+    } catch (e) {}
+  }
+  return { img: t.bmp, w: t.size, h: t.size };
+}
+function flipOpts() { const m = S.flip; return { fit: m.fit, date: m.date, bg: m.bg }; }
+function flipStop() { cancelAnimationFrame(FL.raf); FL.raf = 0; $('#flipPlay').hidden = true; }
+function flipClear() { for (const c of FL.cache.values()) E.free(c); FL.cache.clear(); }
+function flipStart() {
+  flipStop(); busy(false);
+  const cv = $('#pv'), st = $('#stage'), em = $('#pvEmpty');
+  $('#zoomBtn').hidden = true;
+  if (!act.length) {
+    cv.hidden = true; em.hidden = false;
+    em.textContent = 'Mit dem aktuellen Filter ist kein Foto ausgewählt.'; $('#pvInfo').textContent = ''; updateOut(); return;
+  }
+  cv.hidden = false; em.hidden = true;
+  FL.frames = flipFrames();
+  const A = aspectOf(S.flip.format), sw = st.clientWidth - 28, sh = st.clientHeight - 28;
+  const cw = Math.min(sw, sh * A), ch = cw / A, dpr = Math.min(2.5, window.devicePixelRatio || 1);
+  const W = Math.min(1100, Math.round(cw * dpr)), H = Math.round(W / A);
+  const style = [W, H, S.flip.fit, S.flip.date, S.flip.bg].join();
+  if (style !== FL.style) { flipClear(); FL.style = style; }
+  FL.W = W; FL.H = H; cv.width = W; cv.height = H;
+  cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
+  FL.k = -1; FL.t0 = performance.now(); FL.playing = true;
+  FL.raf = requestAnimationFrame(flipTick);
+  updateOut();
+}
+function flipComposed(i) {
+  const t = FL.frames[i]; if (!t) return null;
+  const c = FL.cache.get(t.id); if (c) return c;
+  if (!FL.loading.has(t.id)) {
+    FL.loading.add(t.id);
+    const style = FL.style, W = FL.W, H = FL.H;
+    loadSource(t, Math.max(W, H)).then((src) => {
+      FL.loading.delete(t.id);
+      if (style !== FL.style) { if (src.own) E.free(src.img); return; }
+      const cc = E.canvas(W, H); F.composeFrame(E.ctx2d(cc), W, H, src, t, flipOpts());
+      if (src.own) E.free(src.img);
+      FL.cache.set(t.id, cc);
+      if (FL.cache.size > 36) {           // ältestes, weit entferntes Bild freigeben
+        const near = new Set(); for (let j = -2; j < 10; j++) { const f = FL.frames[(FL.k + j + FL.frames.length) % FL.frames.length]; if (f) near.add(f.id); }
+        for (const [id, v] of FL.cache) { if (!near.has(id)) { E.free(v); FL.cache.delete(id); if (FL.cache.size <= 30) break; } }
+      }
+    }, () => FL.loading.delete(t.id));
+  }
+  return null;
+}
+function flipDraw(i, x) {
+  const c = flipComposed(i);
+  if (c) { x.drawImage(c, 0, 0); return; }
+  const t = FL.frames[i]; F.composeFrame(x, FL.W, FL.H, { img: t.bmp, w: t.size, h: t.size }, t, flipOpts());
+}
+function flipTick(now) {
+  const n = FL.frames.length, m = S.flip, dur = 1000 / m.fps;
+  if (!n) return;
+  const cv = $('#pv'), x = cv.getContext('2d');
+  // rAF-Zeitstempel kann knapp vor t0 liegen → nie negativ werden lassen
+  const el = Math.max(0, now - FL.t0), k = FL.playing ? Math.floor(el / dur) % n : Math.min(n - 1, Math.max(0, FL.k));
+  for (let j = 1; j <= 6; j++) flipComposed((k + j) % n);
+  const fadeMs = m.fade ? Math.min(dur * 0.6, 450) : 0, into = el % dur;
+  if (k !== FL.k || (FL.playing && fadeMs && into < fadeMs + 20)) {
+    flipDraw(k, x);
+    if (FL.playing && fadeMs && into < fadeMs && n > 1) {
+      x.globalAlpha = 1 - into / fadeMs;
+      const prev = flipComposed((k - 1 + n) % n); if (prev) x.drawImage(prev, 0, 0);
+      x.globalAlpha = 1;
+    }
+    if (k !== FL.k) {
+      FL.k = k;
+      const t = FL.frames[k];
+      $('#pvInfo').textContent = `Bild ${k + 1} von ${n} · ${m.fps} Bilder/s · ${nf(n / m.fps, n / m.fps < 10 ? 1 : 0)} s` + (t.date ? ' · ' + new Date(t.date).toLocaleDateString('de-DE') : '');
+    }
+  }
+  FL.raf = requestAnimationFrame(flipTick);
+}
+function flipToggle() {
+  const n = FL.frames.length; if (!n) return;
+  FL.playing = !FL.playing;
+  if (FL.playing) FL.t0 = performance.now() - FL.k * (1000 / S.flip.fps);
+  $('#flipPlay').hidden = FL.playing;
+}
+
+async function exportFlip() {
+  const m = S.flip, frames = flipFrames(), n = frames.length;
+  if (!n) return;
+  flipStop();
+  let lock = null; try { lock = await navigator.wakeLock.request('screen'); } catch (e) {}
+  const P = progressModal(m.out === 'video' ? 'Video wird erstellt' : 'Druckbogen wird erstellt',
+    m.out === 'video' ? 'Bitte die App geöffnet lassen und den Bildschirm nicht sperren, bis das Video fertig ist.' : `${nf(n)} Karten auf ${nf(Math.ceil(n / F.PER_PAGE))} Seiten A4.`);
+  try {
+    if (m.out === 'video') {
+      const { W, H } = flipVideoSize(), o = flipOpts(), blobs = new Array(n);
+      for (let i = 0; i < n; i++) {
+        if (P.cancelled) throw new Error('abort');
+        const src = await loadSource(frames[i], Math.max(W, H));
+        const c = E.canvas(W, H); F.composeFrame(E.ctx2d(c), W, H, src, frames[i], o);
+        if (src.own) E.free(src.img);
+        blobs[i] = await toBlob(c, 'image/jpeg', 0.92); E.free(c);
+        P.set(0.4 * (i + 1) / n, `Bilder vorbereiten: ${i + 1} von ${n}`);
+      }
+      const poster = URL.createObjectURL(blobs[0]);
+      const getFrame = async (i) => {
+        try { return await createImageBitmap(blobs[i]); } catch (e) {
+          const d = await decode(blobs[i]); const c = E.canvas(d.w, d.h); E.ctx2d(c).drawImage(d.img, 0, 0); d.done(); return c;
+        }
+      };
+      const { blob, mime } = await F.recordVideo({ W, H, count: n, fps: m.fps, loops: m.loops, fade: m.fade, getFrame,
+        onProgress: (p) => P.set(0.4 + 0.6 * p, `Aufnahme (Echtzeit): ${Math.round(p * 100)} %`), isCancelled: () => P.cancelled });
+      P.close();
+      const ext = mime.includes('mp4') ? 'mp4' : 'webm';
+      showFileResult(blob, `Daumenkino-${W}x${H}.${ext}`, { video: true, poster,
+        facts: `<b>${W} × ${H}</b> · ${nf(n * m.loops / m.fps, 1)} s · ${nf(blob.size / 1048576, 1)} MB`,
+        hint: ext === 'mp4' ? 'Im Teilen-Menü auf „Video sichern“ tippen, dann liegt das Daumenkino in deiner Fotos-App.' : 'Dieser Browser erzeugt WebM-Videos. Die Fotos-App auf dem iPhone kann sie nicht sichern, „Datei laden“ funktioniert.' });
+    } else {
+      const dpi = 200, pages = Math.ceil(n / F.PER_PAGE), out = [], o = flipOpts();
+      let poster = null;
+      for (let p = 0; p < pages; p++) {
+        const items = [];
+        for (let j = 0; j < F.PER_PAGE && p * F.PER_PAGE + j < n; j++) {
+          if (P.cancelled) throw new Error('abort');
+          const i = p * F.PER_PAGE + j, t = frames[i];
+          items.push({ no: i + 1, t, src: await loadSource(t, 800) });
+          P.set((i + 1) / n * 0.95, `Karte ${i + 1} von ${n}`);
+        }
+        const mm = dpi / 25.4, c = E.canvas(Math.round(210 * mm), Math.round(297 * mm));
+        F.drawPrintPage(E.ctx2d(c), dpi, items, p + 1, pages, o);
+        items.forEach((it) => { if (it.src.own) E.free(it.src.img); });
+        const b = await toBlob(c, 'image/jpeg', 0.9);
+        if (!poster) poster = URL.createObjectURL(b);
+        out.push({ bytes: new Uint8Array(await b.arrayBuffer()), w: c.width, h: c.height });
+        E.free(c);
+      }
+      const pdf = F.makePdf(out);
+      P.close();
+      showFileResult(pdf, `Daumenkino-${n}-Karten.pdf`, { image: poster,
+        facts: `<b>${pages} Seite${pages === 1 ? '' : 'n'} A4</b> · ${n} Karten · ${nf(pdf.size / 1048576, 1)} MB`,
+        hint: 'Zum Drucken im Teilen-Menü „Drucken“ wählen und die Größe auf 100 % lassen. Oder „In Dateien sichern“.' });
+    }
+  } catch (e) {
+    P.close();
+    if (e.message !== 'abort') { console.error(e); alert('Das Daumenkino konnte nicht erstellt werden: ' + e.message); }
+  } finally {
+    if (lock) lock.release().catch(() => {});
+    if (S.mode === 'flip') flipStart();
+  }
+}
+
+function showFileResult(blob, name, o) {
+  const file = new File([blob], name, { type: blob.type });
+  const url = URL.createObjectURL(blob);
+  const canShare = !!(navigator.canShare && navigator.canShare({ files: [file] }));
+  const media = o.video ? h('video', { class: 'res', src: url, poster: o.poster, controls: true, playsinline: true, loop: true, muted: true, autoplay: true })
+    : h('img', { class: 'res', src: o.image, alt: 'Vorschau' });
+  const bd = h('div', { class: 'backdrop center' });
+  const close = () => { bd.remove(); document.body.classList.remove('locked'); setTimeout(() => { URL.revokeObjectURL(url); if (o.poster) URL.revokeObjectURL(o.poster); if (o.image) URL.revokeObjectURL(o.image); }, 60000); };
+  const box = h('div', { class: 'modal' }, h('h3', null, 'Fertig!'), media, h('div', { class: 'facts', html: o.facts }),
+    canShare ? h('button', { class: 'btn primary', onclick: async () => {
+      try { await navigator.share({ files: [file] }); } catch (e) { if (e.name !== 'AbortError') toast('Teilen nicht möglich. Bitte „Datei laden“ verwenden.'); }
+    } }, o.video ? 'In Fotos sichern oder teilen' : 'Drucken, sichern oder teilen') : null,
+    h('a', { class: 'btn' + (canShare ? '' : ' primary'), href: url, download: name, style: 'text-decoration:none' }, 'Datei laden'),
+    h('button', { class: 'btn', onclick: close }, 'Schließen'),
+    h('p', { style: 'font-size:13px;margin:12px 0 0' }, o.hint));
+  bd.append(box); document.body.append(bd); document.body.classList.add('locked');
+}
+
 /* ── Vollbild-Betrachter mit Zoom ──────────────────── */
 const V = { s: 1, tx: 0, ty: 0, fit: 1, ptrs: new Map(), raf: 0, lastTap: 0, moved: false, pinch: null };
 function openViewer() {
@@ -1092,14 +1319,15 @@ function wire() {
   $('#libBtn').addEventListener('click', () => openLibrary(false));
   $('#modeSeg').addEventListener('click', (e) => {
     const b = e.target.closest('button'); if (!b) return;
-    S.mode = b.dataset.m; save(); buildModeUI(); buildLookUI(); schedule(0);
+    S.mode = b.dataset.m; save(); buildModeUI(); buildLookUI(); buildOutUI(); schedule(0);
   });
-  $('#goBtn').addEventListener('click', exportMosaic);
+  $('#goBtn').addEventListener('click', () => (S.mode === 'flip' ? exportFlip() : exportMosaic()));
   $('#zoomBtn').addEventListener('click', openViewer);
-  $('#pv').addEventListener('click', openViewer);
+  $('#pv').addEventListener('click', () => (S.mode === 'flip' ? flipToggle() : openViewer()));
+  $('#flipPlay').addEventListener('click', flipToggle);
   let rt = 0;
   window.addEventListener('resize', () => {
-    clearTimeout(rt); rt = setTimeout(() => { if (L) drawPreview(); if (!$('#viewer').hidden) { vResize(); vFit(); vDraw(); } }, 150);
+    clearTimeout(rt); rt = setTimeout(() => { if (S.mode === 'flip' && lib.length) flipStart(); else if (L) drawPreview(); if (!$('#viewer').hidden) { vResize(); vFit(); vDraw(); } }, 150);
   });
   initViewer();
 }

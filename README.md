@@ -9,6 +9,9 @@
 > **Fotos filtern:** nach Jahr oder eigenem Zeitraum (Aufnahmedatum aus den EXIF-Daten, lokal gelesen) und nach Sammlungen:
 > Jede Auswahl, z. B. ein ganzes Album aus der iOS-Fotoauswahl, wird als eigene Sammlung gemerkt (automatisch benannt, z. B. „Juli 2024“,
 > umbenennbar) und lässt sich im Mosaik an- und abschalten. Die Fotoübersicht ist nach Monaten sortiert.
+> **Daumenkino:** die ausgewählten Fotos schnell hintereinander (nach Datum, Auswahl, Farbe oder zufällig, 1–24 Bilder/s,
+> Füllen oder ganzes Foto, Überblenden, Datum einblenden). Ausgabe als **Video** (MP4, 720p/1080p, direkt in Fotos sichern) oder
+> **zum Ausdrucken** als PDF: je A4-Seite 12 nummerierte Karten mit Bindestreifen zum Ausschneiden und Binden.
 > **Datenschutz:** Alles wird auf dem iPhone verarbeitet, nichts geht in eine Cloud. Es gibt keinen Server, kein Konto und keine
 > Statistik; eine Content-Security-Policy (`connect-src 'none'`, `form-action 'none'`) verbietet dem Browser jede Datenübertragung.
 > Nach dem ersten Öffnen läuft die App per Service Worker auch komplett offline (Flugmodus). Die Auswahl bleibt nur lokal auf dem Gerät
