@@ -9,7 +9,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Mosaik">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'none'; font-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src blob:; font-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="format-detection" content="telephone=no">
 <meta name="robots" content="noindex">
@@ -87,11 +87,16 @@ input,select,textarea{font:inherit;color:inherit}
   .stage{height:calc(100vh - 110px)}
 }
 
+.stage .play{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:64px;height:64px;border-radius:50%;background:rgba(0,0,0,.5);
+  display:grid;place-items:center;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
+.stage .play svg{width:30px;height:30px;fill:#fff;margin-left:4px}
+.modal video.res{display:block;width:100%}
+
 /* Segmente */
 .seg{display:flex;background:var(--fill);border-radius:10px;padding:2px;gap:2px;margin:10px 0 6px}
 .seg button{flex:1;padding:7px 4px;border-radius:8px;font-size:14px;font-weight:600;color:var(--text);white-space:nowrap}
 .seg button.on{background:var(--seg);box-shadow:0 3px 8px rgba(0,0,0,.12),0 0 0 .5px rgba(0,0,0,.04)}
-.seg.big button{padding:9px 4px;font-size:15px}
+.seg.big button{padding:9px 2px;font-size:14px}
 .mode-desc{font-size:14px;color:var(--text-2);margin:4px 4px 14px}
 
 /* Gruppen im iOS-Stil */
@@ -236,12 +241,13 @@ button.mini.bad{color:var(--bad)}
           <canvas id="pv"></canvas>
           <div class="empty-msg" id="pvEmpty" hidden></div>
           <div class="busy" id="pvBusy" hidden><i></i><span>Berechne …</span></div>
+          <button class="play" id="flipPlay" hidden aria-label="Abspielen"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></button>
           <button class="fab" id="zoomBtn" aria-label="Vergrößern"><svg viewBox="0 0 24 24"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg></button>
         </div>
         <div class="pv-info" id="pvInfo"></div>
       </div>
       <div class="panel">
-        <div class="seg big" id="modeSeg"><button data-m="raster">Raster</button><button data-m="form">Form</button><button data-m="haupt">Hauptbild</button></div>
+        <div class="seg big" id="modeSeg"><button data-m="raster">Raster</button><button data-m="form">Form</button><button data-m="haupt">Hauptbild</button><button data-m="flip">Daumenkino</button></div>
         <p class="mode-desc" id="modeDesc"></p>
         <div class="group" id="gMode"></div>
         <div id="gModeNote"></div>
