@@ -3,7 +3,7 @@
 import * as E from './engine.js';
 
 export const SIZE = 1024;                       // ausgerichtete Gesichter: Quadrat SIZE×SIZE
-const EYE_L = [0.39, 0.43], EYE_R = [0.61, 0.43]; // Zielposition der Augen (Anteil der Kantenlänge)
+const EYE_L = [0.41, 0.42], EYE_R = [0.59, 0.42]; // Zielposition der Augen (Anteil der Kantenlänge)
 
 let api = null, loading = null;
 export function loadModel() {

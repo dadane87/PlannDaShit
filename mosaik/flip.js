@@ -50,88 +50,216 @@ export function composeFrame(ctx, W, H, src, t, o) {
 }
 
 /* ── Video ─────────────────────────────────────────── */
-export function videoMime() {
+export function videoMime(audio) {
   if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return null;
-  const c = ['video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
+  // MP4 immer zuerst: nur MP4 lässt sich auf dem iPhone in der Fotos-App sichern
+  const c = audio
+    ? ['video/mp4;codecs=avc1,mp4a.40.2', 'video/mp4;codecs="avc1.640028,mp4a.40.2"', 'video/mp4;codecs=avc1,opus', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+    : ['video/mp4;codecs=avc1.640028', 'video/mp4;codecs=avc1', 'video/mp4', 'video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'];
   for (const m of c) { try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) {} }
   return null;
 }
 const sleep = (ms) => new Promise((r) => setTimeout(r, Math.max(0, ms)));
 
-/* Nimmt das Daumenkino in Echtzeit auf. getFrame(i) liefert ein fertig gestaltetes Bild (W×H).
-   Ist ein Bild noch nicht geladen, wird die Aufnahme pausiert, damit kein Bild zu lang stehen bleibt. */
-export async function recordVideo({ W, H, count, fps, loops, fade, getFrame, onProgress, isCancelled }) {
-  const mime = videoMime();
+/* Nimmt das Daumenkino in Echtzeit auf.
+   N Bilder insgesamt (mit Durchläufen), Bild k zeigt Eintrag k % count, dauert durs[k] ms.
+   paint(ctx, k, u, d, img) zeichnet Bild k zum Zeitpunkt u (0…d); img(o) liefert das geladene Bild k+o oder null.
+   sound(actx, dest, when, k): optionales Geräusch beim Bildwechsel. Fehlt ein Bild noch, pausiert die Aufnahme. */
+export async function recordVideo({ W, H, N, count, durs, getFrame, paint, sound, soundAt, onProgress, isCancelled }) {
+  let actx = null, dest = null;
+  if (sound) {
+    try { actx = new (window.AudioContext || window.webkitAudioContext)(); await actx.resume(); dest = actx.createMediaStreamDestination(); }
+    catch (e) { actx = null; dest = null; }
+  }
+  const mime = videoMime(!!dest) || videoMime(false);
   if (!mime) throw new Error('Dieser Browser kann keine Videos aufnehmen.');
   const cv = E.canvas(W, H), x = cv.getContext('2d');
   // Safari nimmt nur Zeichenflächen zuverlässig auf, die im Dokument hängen
   cv.style.cssText = 'position:fixed;left:0;top:0;width:2px;height:2px;opacity:0.01;pointer-events:none;z-index:-1';
   document.body.append(cv);
-  const stream = cv.captureStream(30);
+  const vstream = cv.captureStream(30);
+  const tracks = [...vstream.getVideoTracks(), ...(dest ? dest.stream.getAudioTracks() : [])];
+  const stream = new MediaStream(tracks);
   const bps = Math.round(Math.min(16e6, Math.max(3e6, W * H * 4)));
-  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bps });
+  let rec;
+  try { rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: bps }); }
+  catch (e) { rec = new MediaRecorder(new MediaStream(vstream.getVideoTracks()), { mimeType: videoMime(false), videoBitsPerSecond: bps }); actx = null; }
   const chunks = [];
   rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
   const stopped = new Promise((r) => { rec.onstop = r; });
 
-  const N = count * loops, dur = 1000 / fps, fadeMs = fade ? Math.min(dur * 0.6, 450) : 0;
   const cache = new Map();
   const want = (k) => {
-    const i = k % count;
+    const i = ((k % count) + count) % count;
     if (!cache.has(i)) { const e = { v: null }; e.p = getFrame(i).then((v) => (e.v = v)); cache.set(i, e); }
     return cache.get(i);
   };
   const evict = (k) => {
-    if (count <= 8) return;
-    const keep = new Set(); for (let j = -1; j <= 6; j++) keep.add(((k + j) % count + count) % count);
+    if (count <= 10) return;
+    const keep = new Set(); for (let j = -2; j <= 6; j++) keep.add((((k + j) % count) + count) % count);
     for (const [i, e] of cache) if (!keep.has(i)) { if (e.v && e.v.close) e.v.close(); cache.delete(i); }
   };
-  const paint = (prev, cur, a) => {
-    if (prev && a < 1) { x.globalAlpha = 1; x.drawImage(prev, 0, 0, W, H); x.globalAlpha = a; x.drawImage(cur, 0, 0, W, H); x.globalAlpha = 1; }
-    else x.drawImage(cur, 0, 0, W, H);
+  const ready = async (k) => {             // Bilder k-1, k, k+1 müssen da sein
+    const need = [k - 1, k, k + 1].filter((j) => j >= 0 && j < N).map(want).filter((e) => !e.v);
+    if (!need.length) return 0;
+    const w0 = performance.now();
+    if (rec.state === 'recording' && rec.pause) rec.pause();
+    await Promise.all(need.map((e) => e.p));
+    if (rec.state === 'paused') rec.resume();
+    return performance.now() - w0;
   };
+  const img = (k) => (o) => { const j = k + o; if (j < 0 || j >= N) return null; const e = want(j); return e.v; };
   try {
-    let cur = await want(0).p, prev = null;
-    paint(null, cur, 1);
+    await ready(0);
+    paint(x, 0, 0, durs[0], img(0));
     rec.start(1000);
     await sleep(60);
-    let t0 = performance.now();
+    let fs = performance.now();
     for (let k = 0; k < N; k++) {
       if (isCancelled()) throw new Error('abort');
-      for (let j = 1; j <= 5 && k + j < N; j++) want(k + j);
-      const fs = t0 + k * dur;
+      for (let j = 2; j <= 6 && k + j < N; j++) want(k + j);
+      fs += await ready(k);
+      const d = durs[k];
+      let clicked = !actx || k === 0;
       for (;;) {
-        const now = performance.now();
-        if (now >= fs + dur) break;
-        paint(prev, cur, fadeMs && prev ? Math.min(1, (now - fs) / fadeMs) : 1);
-        await sleep(Math.min(33, fs + dur - now));
+        const now = performance.now(), u = now - fs;
+        if (u >= d) break;
+        if (!clicked && u >= soundAt(d)) { clicked = true; sound(actx, dest, actx.currentTime, k); }
+        paint(x, k, u, d, img(k));
+        await sleep(Math.min(16, d - u));
       }
+      fs += d;
       onProgress((k + 1) / N);
-      if (k + 1 < N) {
-        const e = want(k + 1);
-        if (!e.v) {                       // nächstes Bild noch nicht da: Aufnahme anhalten
-          const w0 = performance.now();
-          if (rec.state === 'recording' && rec.pause) rec.pause();
-          await e.p;
-          if (rec.state === 'paused') rec.resume();
-          t0 += performance.now() - w0;
-        }
-        prev = cur;
-        cur = e.v;
-        evict(k + 1);
-      }
+      evict(k + 1);
     }
-    paint(null, cur, 1); await sleep(120);
+    paint(x, N - 1, durs[N - 1], durs[N - 1], img(N - 1)); await sleep(150);
     rec.stop(); await stopped;
   } catch (err) {
     if (rec.state !== 'inactive') { rec.stop(); await stopped; }
     throw err;
   } finally {
-    stream.getTracks().forEach((t) => t.stop());
+    stream.getTracks().forEach((t) => t.stop()); vstream.getTracks().forEach((t) => t.stop());
+    if (actx) actx.close().catch(() => {});
     cv.remove(); E.free(cv);
     for (const e of cache.values()) if (e.v && e.v.close) e.v.close();
   }
-  return { blob: new Blob(chunks, { type: mime.split(';')[0] }), mime };
+  const type = rec.mimeType || mime;
+  return { blob: new Blob(chunks, { type: type.split(';')[0] }), mime: type };
+}
+
+/* ── „Echtes Daumenkino“: Papier, wegklappende Blätter, Klatschen ── */
+// Ungleichmäßiges Tempo: leichte Schwankung, ab und zu bleibt ein Blatt hängen und die nächsten rutschen schneller
+export function paperDurations(N, fps, life, seed) {
+  const r = E.rng(seed), base = 1000 / fps, out = new Float64Array(N);
+  let catchup = 0;
+  for (let k = 0; k < N; k++) {
+    let f = 1 + (r() - 0.5) * 0.55 * life;
+    if (catchup > 0) { f *= 0.72; catchup--; } else if (r() < 0.07 * life) { f *= 1.9; catchup = 2; }
+    out[k] = Math.max(base * 0.45, base * f);
+  }
+  return out;
+}
+export const flipMs = (d) => Math.min(d * 0.5, 120);    // Dauer des Wegklappens
+
+let GRAIN = null;
+function grain(ctx) {
+  if (!GRAIN) {
+    const c = E.canvas(160, 160), x = c.getContext('2d'), id = x.createImageData(160, 160), r = E.rng(77);
+    for (let i = 0; i < id.data.length; i += 4) { const v = 200 + r() * 55; id.data[i] = v; id.data[i + 1] = v * 0.985; id.data[i + 2] = v * 0.95; id.data[i + 3] = 255; }
+    x.putImageData(id, 0, 0); GRAIN = c;
+  }
+  return ctx.createPattern(GRAIN, 'repeat');
+}
+export function paperGeom(W, H) {
+  const s = Math.min(W, H), m = Math.round(s * 0.05), st = Math.max(3, Math.round(s * 0.024));
+  const card = { x: m, y: Math.round(m * 0.8), w: W - 2 * m - st, h: H - Math.round(m * 1.6) - st };
+  const pad = Math.round(s * 0.03);
+  return { s, st, card, ph: { x: card.x + pad, y: card.y + pad, w: card.w - 2 * pad, h: card.h - 2 * pad } };
+}
+function drawCard(ctx, g, im, opts) {
+  const { card, ph } = g;
+  ctx.fillStyle = '#f7f4ee'; ctx.fillRect(card.x, card.y, card.w, card.h);
+  if (im) { ctx.save(); ctx.beginPath(); ctx.rect(ph.x, ph.y, ph.w, ph.h); ctx.clip(); drawPhoto(ctx, { img: im, w: im.width, h: im.height }, ph.x, ph.y, ph.w, ph.h, 'fill'); ctx.restore(); }
+  if (opts && opts.ghost && opts.ghostA > 0) {
+    ctx.save(); ctx.globalAlpha = opts.ghostA; ctx.beginPath(); ctx.rect(ph.x, ph.y, ph.w, ph.h); ctx.clip();
+    drawPhoto(ctx, { img: opts.ghost, w: opts.ghost.width, h: opts.ghost.height }, ph.x, ph.y, ph.w, ph.h, 'fill'); ctx.restore();
+  }
+  ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.5;
+  ctx.fillStyle = grain(ctx); ctx.fillRect(card.x, card.y, card.w, card.h); ctx.restore();
+  ctx.strokeStyle = 'rgba(70,60,45,.22)'; ctx.lineWidth = 1; ctx.strokeRect(card.x + 0.5, card.y + 0.5, card.w - 1, card.h - 1);
+}
+/* Ein Bild des Papier-Daumenkinos. o = {cur, prev, next, u, d, k, total, life, bg} */
+export function drawPaper(ctx, W, H, o) {
+  const g = paperGeom(W, H), { card, st, s } = g, life = o.life;
+  ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
+  ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+  ctx.fillStyle = o.bg; ctx.fillRect(0, 0, W, H);
+  // Blattstapel: wird beim Durchblättern dünner
+  const L = 1 + Math.round(5 * Math.max(0, 1 - o.k / Math.max(1, o.total)));
+  ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.35)'; ctx.shadowBlur = s * 0.03; ctx.shadowOffsetY = s * 0.008;
+  ctx.fillStyle = '#ddd6c9'; ctx.fillRect(card.x + st, card.y + st, card.w, card.h); ctx.restore();
+  for (let i = L; i >= 1; i--) {
+    const off = st * i / L;
+    ctx.fillStyle = i % 2 ? '#ebe6dc' : '#e2dccf'; ctx.fillRect(card.x + off, card.y + off, card.w, card.h);
+    ctx.strokeStyle = 'rgba(70,60,45,.25)'; ctx.lineWidth = 1; ctx.strokeRect(card.x + off + 0.5, card.y + off + 0.5, card.w - 1, card.h - 1);
+  }
+  const f = flipMs(o.d), cy = card.y + card.h / 2;
+  if (o.prev && o.u < f) {
+    // 1) neue Seite liegt schon da, das nächste Motiv schimmert durch, Schatten des wegklappenden Blatts
+    const p = Math.pow(o.u / f, 1.35);
+    drawCard(ctx, g, o.cur, { ghost: o.next, ghostA: 0.12 * life * (1 - p) });
+    const ex = card.x + card.w * Math.cos(p * Math.PI / 2);
+    const sg = ctx.createLinearGradient(card.x, 0, Math.min(card.x + card.w, ex + s * 0.12), 0);
+    sg.addColorStop(0, 'rgba(0,0,0,0)'); sg.addColorStop(0.75, `rgba(0,0,0,${0.32 * (1 - p)})`); sg.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = sg; ctx.fillRect(card.x, card.y, card.w, card.h);
+    // 2) altes Blatt klappt an der Bindung (links) weg: wird schmal, rechte Kante hebt sich, Bewegungsunschärfe
+    const steps = [[0.16, 0.22], [0.08, 0.3], [0, 1]];
+    for (const [back, a] of steps) {
+      const q = Math.max(0, p - back * life), sx = Math.max(0.02, Math.cos(q * Math.PI / 2));
+      const b = -0.1 * life * Math.sin(q * Math.PI) * (card.h / card.w), dS = 1 - 0.04 * life * Math.sin(q * Math.PI);
+      ctx.save(); ctx.globalAlpha = a;
+      ctx.setTransform(sx, b, 0, dS, card.x - sx * card.x, cy - dS * cy - b * card.x);
+      drawCard(ctx, g, o.prev, null);
+      ctx.fillStyle = `rgba(0,0,0,${0.4 * q})`; ctx.fillRect(card.x, card.y, card.w, card.h);
+      ctx.restore();
+    }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  } else {
+    // 3) „Klatsch“: Blatt rastet mit kleinem Ruck ein und wölbt sich kurz
+    const q = (o.u - f) / 80;
+    let ty = 0, sy = 1, sx = 1, b = 0;
+    if (o.prev && q >= 0 && q < 1) { const j = Math.sin(q * Math.PI) * (1 - q); ty = s * 0.007 * life * j; sy = 1 - 0.012 * life * j; }
+    // Spannung: kurz bevor das Blatt entwischt, hebt sich die rechte Kante leicht
+    const pre = o.next ? (o.u - o.d * 0.84) / (o.d * 0.16) : -1;
+    if (pre > 0) { sx = 1 - 0.035 * life * pre; b = -0.05 * life * pre * (card.h / card.w); }
+    ctx.setTransform(sx, b, 0, sy, card.x - sx * card.x, cy - sy * cy - b * card.x + ty);
+    drawCard(ctx, g, o.cur, null);
+    if (pre > 0) { ctx.fillStyle = `rgba(0,0,0,${0.08 * pre * life})`; ctx.fillRect(card.x, card.y, card.w, card.h); }
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+}
+
+/* Trockenes Klacken eines Papierblatts, rein synthetisch (WebAudio) */
+let CLICKS = null;
+export function paperClick(actx, dest, when, k) {
+  if (!CLICKS || CLICKS.sr !== actx.sampleRate) {
+    const sr = actx.sampleRate, r = E.rng(5); CLICKS = { sr, bufs: [] };
+    for (let v = 0; v < 6; v++) {
+      const len = Math.round(sr * 0.06), buf = actx.createBuffer(1, len, sr), d = buf.getChannelData(0);
+      const fr = 120 + r() * 60, dk = 70 + r() * 40;
+      for (let i = 0; i < len; i++) {
+        const t = i / sr;
+        d[i] = (r() * 2 - 1) * Math.exp(-t * dk) * 0.8 + Math.sin(2 * Math.PI * fr * t) * Math.exp(-t * 55) * 0.6;
+      }
+      CLICKS.bufs.push(buf);
+    }
+  }
+  const src = actx.createBufferSource(); src.buffer = CLICKS.bufs[k % CLICKS.bufs.length];
+  const hp = actx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 90;
+  const pk = actx.createBiquadFilter(); pk.type = 'peaking'; pk.frequency.value = 2200 + (k % 5) * 180; pk.gain.value = 6; pk.Q.value = 0.9;
+  const g = actx.createGain(); g.gain.value = 0.35 + ((k * 7) % 5) * 0.05;
+  src.connect(hp); hp.connect(pk); pk.connect(g); g.connect(dest);
+  src.start(when);
 }
 
 /* ── Druckbogen: A4, 2 × 6 Karten mit Bindestreifen ── */

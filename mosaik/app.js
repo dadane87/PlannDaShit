@@ -40,7 +40,7 @@ const DEF = {
   raster: { format: 'auto', autoCols: true, cols: 8, sort: 'zufall', big: 0, gap: 0.04, radius: 0, bg: '#ffffff' },
   form: { format: 'auto', shape: 'herz', text: 'LOVE', cols: 36, sort: 'zufall', threshold: 0.5, invert: false, gap: 0.06, radius: 0.12, bg: '#ffffff' },
   flip: { src: 'fotos', order: 'datum', fps: 8, format: '4:5', fit: 'fill', fade: false, date: true, loops: 1, bg: '#000000', out: 'video', vres: 1080,
-    vper: 12, mdur: 1.2, mhold: 0.6, mloop: true, morder: 'auswahl' },
+    vper: 12, mdur: 1.2, mhold: 0.6, mloop: true, morder: 'auswahl', paper: false, sound: true, life: 0.6 },
   haupt: { format: 'auto', cols: 60, variety: 0.5, spacing: 2, color: 0.3, alpha: 0.12, gap: 0, radius: 0, bg: '#ffffff' },
 };
 function loadSettings() {
@@ -648,7 +648,11 @@ function buildModeUI() {
       g.append(segment('Bilder aus dem Video', [[6, '6 pro s'], [12, '12 pro s'], [24, '24 pro s']], () => m.vper, (v) => { m.vper = +v; if (VD.file) loadVideo(VD.file); }));
       g.append(slider('Tempo', { min: 1, max: 30, get: () => m.fps, set: (v) => m.fps = v, fmt: (v) => `${v} Bilder/s` + (v === m.vper ? ' (Echtzeit)' : v < m.vper ? ' (Zeitlupe)' : ' (Zeitraffer)') }));
       g.append(segment('Bildausschnitt', [['fill', 'Füllen'], ['ganz', 'Ganzes Bild']], () => m.fit, (v) => m.fit = v));
-      g.append(toggle('Überblenden', () => m.fade, (v) => m.fade = v, 'Weicher Übergang statt hartem Schnitt'));
+      g.append(toggle('Echtes Daumenkino', () => m.paper, (v) => { m.paper = v; if (v && m.sound) ensureAudio(); buildModeUI(); }, 'Papierblätter klappen weg und rasten mit Klacken ein, das Tempo ist leicht unregelmäßig'));
+      if (m.paper) {
+        g.append(toggle('Blättergeräusch', () => m.sound, (v) => { m.sound = v; if (v) ensureAudio(); }, 'In der Vorschau und im Video'));
+        g.append(slider('Lebendigkeit', { min: 0.2, max: 1, step: 0.05, get: () => m.life, set: (v) => m.life = v, fmt: pct, sub: 'Wie stark Blätter kippen, hängen bleiben und durchscheinen' }));
+      } else g.append(toggle('Überblenden', () => m.fade, (v) => m.fade = v, 'Weicher Übergang statt hartem Schnitt'));
       note.append(h('p', { class: 'note' }, 'Live Photo: In der Fotos-App das Live Photo öffnen, auf Teilen tippen und „Als Video sichern“ wählen. Danach hier das neue Video auswählen. Aus 3 Sekunden Live Photo werden bei 12 pro s 36 Bilder, also 3 Seiten zum Ausdrucken.'));
       return;
     }
@@ -671,7 +675,11 @@ function buildModeUI() {
     g.append(segment('Reihenfolge', [['datum', 'Datum'], ['auswahl', 'Auswahl'], ['farbe', 'Farbe'], ['zufall', 'Zufall']], () => m.order, (v) => m.order = v));
     g.append(slider('Tempo', { min: 1, max: 24, get: () => m.fps, set: (v) => m.fps = v, fmt: (v) => `${v} Bild${v > 1 ? 'er' : ''}/s`, sub: 'Für ein echtes Daumenkino-Gefühl 8–12 Bilder pro Sekunde' }));
     g.append(segment('Bildausschnitt', [['fill', 'Füllen'], ['ganz', 'Ganzes Foto']], () => m.fit, (v) => m.fit = v));
-    g.append(toggle('Überblenden', () => m.fade, (v) => m.fade = v, 'Weicher Übergang statt hartem Schnitt'));
+    g.append(toggle('Echtes Daumenkino', () => m.paper, (v) => { m.paper = v; if (v && m.sound) ensureAudio(); buildModeUI(); }, 'Papierblätter klappen weg und rasten mit Klacken ein, das Tempo ist leicht unregelmäßig'));
+  if (m.paper) {
+    g.append(toggle('Blättergeräusch', () => m.sound, (v) => { m.sound = v; if (v) ensureAudio(); }, 'In der Vorschau und im Video'));
+    g.append(slider('Lebendigkeit', { min: 0.2, max: 1, step: 0.05, get: () => m.life, set: (v) => m.life = v, fmt: pct, sub: 'Wie stark Blätter kippen, hängen bleiben und durchscheinen' }));
+  } else g.append(toggle('Überblenden', () => m.fade, (v) => m.fade = v, 'Weicher Übergang statt hartem Schnitt'));
     g.append(toggle('Datum einblenden', () => m.date, (v) => m.date = v, 'Aufnahmedatum unten rechts'));
     if (m.order === 'zufall') g.append(link('Neu mischen', reshuffle, h('span', { class: 'chev' }, '⟳')));
     if (act.some((t) => !t.file && !t.demo)) note.append(h('p', { class: 'note' }, 'Einige Fotos stammen aus einer früheren Sitzung und liegen nur als kleine, quadratische Vorschau vor. Für volle Qualität diese Fotos neu hinzufügen.'));
@@ -1081,9 +1089,18 @@ function flipCount() {
   if (m.src === 'morph') return MO.faces.length ? getMorph().count : 0;
   return act.length;
 }
+function flipPaper() { return S.flip.src !== 'morph' && S.flip.paper; }
 function flipOpts() {
   const m = S.flip;
-  return { fit: m.src === 'morph' ? 'fill' : m.fit, date: m.src === 'fotos' && m.date, bg: m.bg, fade: m.src !== 'morph' && m.fade };
+  return { fit: m.src === 'morph' ? 'fill' : m.fit, date: m.src === 'fotos' && m.date, bg: m.bg, fade: m.src !== 'morph' && !m.paper && m.fade };
+}
+// Ton für die Vorschau: iOS erlaubt Audio erst nach einer Berührung
+const PA = { actx: null };
+function ensureAudio() {
+  try {
+    if (!PA.actx) PA.actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (PA.actx.state !== 'running') PA.actx.resume();
+  } catch (e) {}
 }
 function flipStop() { cancelAnimationFrame(FL.raf); FL.raf = 0; $('#flipPlay').hidden = true; }
 function flipClear() { for (const c of FL.cache.values()) E.free(c); FL.cache.clear(); }
@@ -1107,7 +1124,10 @@ function flipStart() {
   if (style !== FL.style) { flipClear(); FL.style = style; }
   FL.W = W; FL.H = H; cv.width = W; cv.height = H;
   cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
-  FL.k = -1; FL.t0 = performance.now(); FL.playing = true;
+  const n = FL.items.length, fps = flipFps();
+  FL.durs = flipPaper() ? F.paperDurations(n, fps, m.life, S.seed) : new Float64Array(n).fill(1000 / fps);
+  FL.cum = new Float64Array(n + 1); for (let i = 0; i < n; i++) FL.cum[i + 1] = FL.cum[i] + FL.durs[i];
+  FL.k = -1; FL.el = 0; FL.t0 = performance.now(); FL.playing = true;
   FL.raf = requestAnimationFrame(flipTick);
   updateOut();
 }
@@ -1140,33 +1160,59 @@ function flipDraw(i, x) {
   if (it.thumb) F.composeFrame(x, FL.W, FL.H, it.thumb, it, flipOpts());
   else { x.fillStyle = S.flip.bg; x.fillRect(0, 0, FL.W, FL.H); }
 }
+// Bild i als Zeichenfläche (fertig geladen oder vorläufig aus der kleinen Vorschau)
+function flipImg(i) {
+  const n = FL.items.length; i = ((i % n) + n) % n;
+  const c = flipComposed(i); if (c) return c;
+  const it = FL.items[i]; if (!it || !it.thumb) return null;
+  FL.fb = FL.fb || new Map();
+  let f = FL.fb.get(it.id);
+  if (!f) {
+    f = E.canvas(Math.round(FL.W / 2), Math.round(FL.H / 2));
+    F.composeFrame(E.ctx2d(f), f.width, f.height, it.thumb, it, flipOpts());
+    FL.fb.set(it.id, f);
+    if (FL.fb.size > 40) { const [k0, v0] = FL.fb.entries().next().value; E.free(v0); FL.fb.delete(k0); }
+  }
+  return f;
+}
 function flipTick(now) {
-  const n = FL.items.length, fps = flipFps(), dur = 1000 / fps, o = flipOpts();
+  const n = FL.items.length, fps = flipFps(), o = flipOpts(), m = S.flip, paper = flipPaper();
   if (!n) return;
-  const cv = $('#pv'), x = cv.getContext('2d');
+  const cv = $('#pv'), x = cv.getContext('2d'), T = FL.cum[n];
   // rAF-Zeitstempel kann knapp vor t0 liegen → nie negativ werden lassen
-  const el = Math.max(0, now - FL.t0), k = FL.playing ? Math.floor(el / dur) % n : Math.min(n - 1, Math.max(0, FL.k));
+  if (FL.playing) FL.el = Math.max(0, now - FL.t0) % T;
+  const el = FL.el;
+  let lo = 0, hi = n - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (FL.cum[mid] <= el) lo = mid; else hi = mid - 1; }
+  const k = lo, u = el - FL.cum[k], d = FL.durs[k];
   for (let j = 1; j <= 6; j++) flipComposed((k + j) % n);
-  const fadeMs = o.fade ? Math.min(dur * 0.6, 450) : 0, into = el % dur;
-  if (k !== FL.k || (FL.playing && fadeMs && into < fadeMs + 20)) {
-    flipDraw(k, x);
-    if (FL.playing && fadeMs && into < fadeMs && n > 1) {
-      x.globalAlpha = 1 - into / fadeMs;
-      const prev = flipComposed((k - 1 + n) % n); if (prev) x.drawImage(prev, 0, 0);
-      x.globalAlpha = 1;
+  if (paper) {
+    F.drawPaper(x, FL.W, FL.H, { cur: flipImg(k), prev: n > 1 ? flipImg(k - 1) : null, next: n > 1 ? flipImg(k + 1) : null, u, d, k, total: n, life: m.life, bg: m.bg });
+    if (k !== FL.k && FL.playing && m.sound && PA.actx && PA.actx.state === 'running')
+      F.paperClick(PA.actx, PA.actx.destination, PA.actx.currentTime + Math.max(0, F.flipMs(d) - u) / 1000, k);
+  } else {
+    const fadeMs = o.fade ? Math.min(d * 0.6, 450) : 0;
+    if (k !== FL.k || (FL.playing && fadeMs && u < fadeMs + 20)) {
+      flipDraw(k, x);
+      if (FL.playing && fadeMs && u < fadeMs && n > 1) {
+        x.globalAlpha = 1 - u / fadeMs;
+        const prev = flipComposed((k - 1 + n) % n); if (prev) x.drawImage(prev, 0, 0);
+        x.globalAlpha = 1;
+      }
     }
-    if (k !== FL.k) {
-      FL.k = k;
-      const it = FL.items[k], sec = n / fps;
-      $('#pvInfo').textContent = `Bild ${k + 1} von ${n} · ${fps} Bilder/s · ${nf(sec, sec < 10 ? 1 : 0)} s` + (it.date && o.date !== undefined && S.flip.src === 'fotos' ? ' · ' + new Date(it.date).toLocaleDateString('de-DE') : '');
-    }
+  }
+  if (k !== FL.k) {
+    FL.k = k;
+    const it = FL.items[k], sec = T / 1000;
+    $('#pvInfo').textContent = `Bild ${k + 1} von ${n} · ${fps} Bilder/s · ${nf(sec, sec < 10 ? 1 : 0)} s` + (it.date && S.flip.src === 'fotos' ? ' · ' + new Date(it.date).toLocaleDateString('de-DE') : '');
   }
   FL.raf = requestAnimationFrame(flipTick);
 }
 function flipToggle() {
   if (!FL.items.length) return;
+  if (flipPaper() && S.flip.sound) ensureAudio();
   FL.playing = !FL.playing;
-  if (FL.playing) FL.t0 = performance.now() - FL.k * (1000 / flipFps());
+  if (FL.playing) FL.t0 = performance.now() - FL.el;
   $('#flipPlay').hidden = FL.playing;
 }
 
@@ -1253,12 +1299,22 @@ async function exportFlip() {
           const d = await decode(blobs[i]); const c = E.canvas(d.w, d.h); E.ctx2d(c).drawImage(d.img, 0, 0); d.done(); return c;
         }
       };
-      const { blob, mime } = await F.recordVideo({ W, H, count: n, fps, loops: m.loops, fade: o.fade, getFrame,
+      const N = n * m.loops, paper = flipPaper();
+      const durs = paper ? F.paperDurations(N, fps, m.life, S.seed) : new Float64Array(N).fill(1000 / fps);
+      const paint = paper
+        ? (x, k, u, d, img) => F.drawPaper(x, W, H, { cur: img(0), prev: k > 0 ? img(-1) : null, next: img(1), u, d, k: k % n, total: n, life: m.life, bg: m.bg })
+        : (x, k, u, d, img) => {
+          const cur = img(0), prev = k > 0 ? img(-1) : null, fadeMs = o.fade ? Math.min(d * 0.6, 450) : 0;
+          if (prev && fadeMs && u < fadeMs) { x.globalAlpha = 1; x.drawImage(prev, 0, 0, W, H); x.globalAlpha = u / fadeMs; x.drawImage(cur, 0, 0, W, H); x.globalAlpha = 1; }
+          else x.drawImage(cur, 0, 0, W, H);
+        };
+      const { blob, mime } = await F.recordVideo({ W, H, N, count: n, durs, getFrame, paint,
+        sound: paper && m.sound ? F.paperClick : null, soundAt: F.flipMs,
         onProgress: (p) => P.set(0.4 + 0.6 * p, `Aufnahme (Echtzeit): ${Math.round(p * 100)} %`), isCancelled: () => P.cancelled });
       P.close();
       const ext = mime.includes('mp4') ? 'mp4' : 'webm';
       showFileResult(blob, `${name}-${W}x${H}.${ext}`, { video: true, poster,
-        facts: `<b>${W} × ${H}</b> · ${nf(n * m.loops / fps, 1)} s · ${nf(blob.size / 1048576, 1)} MB`,
+        facts: `<b>${W} × ${H}</b> · ${nf(durs.reduce((a, b) => a + b, 0) / 1000, 1)} s · ${nf(blob.size / 1048576, 1)} MB` + (paper && m.sound && /mp4a|opus/.test(mime) ? ' · mit Ton' : ''),
         hint: ext === 'mp4' ? 'Im Teilen-Menü auf „Video sichern“ tippen, dann liegt das Video in deiner Fotos-App.' : 'Dieser Browser erzeugt WebM-Videos. Die Fotos-App auf dem iPhone kann sie nicht sichern, „Datei laden“ funktioniert.' });
     } else {
       const dpi = 200, pages = Math.ceil(n / F.PER_PAGE), out = [];

@@ -12,8 +12,13 @@
 > **Daumenkino:** die ausgewählten Fotos schnell hintereinander (nach Datum, Auswahl, Farbe oder zufällig, 1–24 Bilder/s,
 > Füllen oder ganzes Foto, Überblenden, Datum einblenden). Ausgabe als **Video** (MP4, 720p/1080p, direkt in Fotos sichern) oder
 > **zum Ausdrucken** als PDF: je A4-Seite 12 nummerierte Karten mit Bindestreifen zum Ausschneiden und Binden.
+> Quellen fürs Daumenkino: **Fotos**, **Live Photo / Video** (Einzelbilder 6, 12 oder 24 pro Sekunde; Live Photo vorher in der
+> Fotos-App über *Teilen → Als Video sichern*) und **Gesichter-Morph** (Gesichter werden lokal erkannt, an den Augen ausgerichtet und
+> über ein Dreiecksnetz aus 68 Gesichtspunkten ineinander verformt; Modell: face-api 1.7.15, MIT, unter `mosaik/vendor/`).
+> Option **Echtes Daumenkino**: Papierkarten mit Blattstapel, Blätter klappen an der Bindung weg (Schräglage, Bewegungsunschärfe,
+> Schatten), rasten mit Ruck und synthetischem Klack-Geräusch ein (auch im Video), unregelmäßiges Tempo und durchscheinendes nächstes Motiv.
 > **Datenschutz:** Alles wird auf dem iPhone verarbeitet, nichts geht in eine Cloud. Es gibt keinen Server, kein Konto und keine
-> Statistik; eine Content-Security-Policy (`connect-src 'none'`, `form-action 'none'`) verbietet dem Browser jede Datenübertragung.
+> Statistik; eine Content-Security-Policy (`connect-src 'self'` nur für die eigenen Modelldateien, `form-action 'none'`, keine fremden Quellen) verbietet dem Browser jede Übertragung an andere Server.
 > Nach dem ersten Öffnen läuft die App per Service Worker auch komplett offline (Flugmodus). Die Auswahl bleibt nur lokal auf dem Gerät
 > gespeichert (IndexedDB). Ohne eigene Fotos: *Mit Beispielfotos ausprobieren*.
 > Adresse: `https://dadane87.github.io/PlannDaShit/mosaik/`
