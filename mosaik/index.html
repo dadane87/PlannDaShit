@@ -9,7 +9,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Mosaik">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src blob:; font-src 'none'; connect-src 'none'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src blob:; font-src 'none'; connect-src 'self'; object-src 'none'; frame-src 'none'; form-action 'none'; base-uri 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="format-detection" content="telephone=no">
 <meta name="robots" content="noindex">
@@ -91,6 +91,13 @@ input,select,textarea{font:inherit;color:inherit}
   display:grid;place-items:center;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}
 .stage .play svg{width:30px;height:30px;fill:#fff;margin-left:4px}
 .modal video.res{display:block;width:100%}
+
+/* Gesichter */
+.faces{display:flex;gap:6px;overflow-x:auto;scrollbar-width:none;margin:0 -16px;padding:2px 16px}
+.faces::-webkit-scrollbar{display:none}
+.faces div{position:relative;flex:none}
+.faces img{width:58px;height:58px;border-radius:10px;object-fit:cover;display:block}
+.faces button{position:absolute;top:-4px;right:-4px;width:20px;height:20px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;font-size:11px;line-height:20px;text-align:center}
 
 /* Segmente */
 .seg{display:flex;background:var(--fill);border-radius:10px;padding:2px;gap:2px;margin:10px 0 6px}
@@ -271,6 +278,8 @@ button.mini.bad{color:var(--bad)}
 <input type="file" id="inPhotos" accept="image/*" multiple hidden>
 <input type="file" id="inTarget" accept="image/*" hidden>
 <input type="file" id="inMask" accept="image/*" hidden>
+<input type="file" id="inVideo" accept="video/*" hidden>
+<input type="file" id="inFaces" accept="image/*" multiple hidden>
 <script type="module" src="app.js"></script>
 </body>
 </html>

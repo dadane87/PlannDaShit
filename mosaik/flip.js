@@ -203,3 +203,37 @@ export function makePdf(pages) {
   push(`trailer\n<< /Size ${size} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`);
   return new Blob(parts, { type: 'application/pdf' });
 }
+
+/* ── Video / Live Photo in Einzelbilder zerlegen ─────────
+   Gibt [{blob, w, h}] zurück (JPEG je Bild, spart Speicher). */
+export async function extractVideoFrames(file, { perSec = 12, maxFrames = 180, maxSide = 1440, onProgress, isCancelled }) {
+  const url = URL.createObjectURL(file), v = document.createElement('video');
+  v.muted = true; v.playsInline = true; v.preload = 'auto'; v.setAttribute('playsinline', ''); v.src = url;
+  const wait = (ev, ms, msg) => new Promise((res, rej) => {
+    const t = setTimeout(() => { cleanup(); rej(new Error(msg)); }, ms);
+    const ok = () => { cleanup(); res(); }, bad = () => { cleanup(); rej(new Error('Video nicht lesbar')); };
+    const cleanup = () => { clearTimeout(t); v.removeEventListener(ev, ok); v.removeEventListener('error', bad); };
+    v.addEventListener(ev, ok); v.addEventListener('error', bad);
+  });
+  try {
+    if (v.readyState < 2) await wait('loadeddata', 20000, 'Video lädt nicht');
+    // iOS gibt Bilder oft erst nach einem kurzen Abspielen frei
+    try { await v.play(); v.pause(); } catch (e) {}
+    const dur = v.duration;
+    if (!isFinite(dur) || dur <= 0) throw new Error('Videolänge unbekannt');
+    const n = Math.max(2, Math.min(maxFrames, Math.round(dur * perSec)));
+    const vw = v.videoWidth, vh = v.videoHeight, k = Math.min(1, maxSide / Math.max(vw, vh));
+    const W = Math.round(vw * k), H = Math.round(vh * k);
+    const c = E.canvas(W, H), x = E.ctx2d(c), out = [];
+    for (let i = 0; i < n; i++) {
+      if (isCancelled && isCancelled()) throw new Error('abort');
+      const t = Math.min(dur - 0.001, (i + 0.5) * dur / n);
+      if (Math.abs(v.currentTime - t) > 0.0005) { const p = wait('seeked', 8000, 'Video springt nicht'); v.currentTime = t; await p; }
+      x.drawImage(v, 0, 0, W, H);
+      out.push({ blob: await new Promise((r) => c.toBlob(r, 'image/jpeg', 0.9)), w: W, h: H });
+      if (onProgress) onProgress((i + 1) / n);
+    }
+    E.free(c);
+    return { frames: out, duration: dur };
+  } finally { v.removeAttribute('src'); v.load(); URL.revokeObjectURL(url); }
+}
