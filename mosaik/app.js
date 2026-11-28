@@ -1,6 +1,7 @@
 import * as E from './engine.js';
 import { SHAPES, textShape, imageMask } from './shapes.js';
 import * as F from './flip.js';
+import * as MOR from './morph.js';
 
 /* ── Hilfen ─────────────────────────────────────────── */
 const $ = (s, r = document) => r.querySelector(s);
@@ -38,7 +39,8 @@ const DEF = {
   filter: { range: 'all', from: '', to: '', off: [] },
   raster: { format: 'auto', autoCols: true, cols: 8, sort: 'zufall', big: 0, gap: 0.04, radius: 0, bg: '#ffffff' },
   form: { format: 'auto', shape: 'herz', text: 'LOVE', cols: 36, sort: 'zufall', threshold: 0.5, invert: false, gap: 0.06, radius: 0.12, bg: '#ffffff' },
-  flip: { order: 'datum', fps: 8, format: '4:5', fit: 'fill', fade: false, date: true, loops: 1, bg: '#000000', out: 'video', vres: 1080 },
+  flip: { src: 'fotos', order: 'datum', fps: 8, format: '4:5', fit: 'fill', fade: false, date: true, loops: 1, bg: '#000000', out: 'video', vres: 1080,
+    vper: 12, mdur: 1.2, mhold: 0.6, mloop: true, morder: 'auswahl', paper: false, sound: true, life: 0.6 },
   haupt: { format: 'auto', cols: 60, variety: 0.5, spacing: 2, color: 0.3, alpha: 0.12, gap: 0, radius: 0, bg: '#ffffff' },
 };
 function loadSettings() {
@@ -552,10 +554,10 @@ function updateOut() {
   const f = $('#outFacts'), note = $('#outNote'), go = $('#goBtn');
   if (!f) return;
   if (S.mode === 'flip') {
-    const m = S.flip, n = act.length;
+    const m = S.flip, n = flipCount(), fps = flipFps();
     go.disabled = !n;
     if (m.out === 'video') {
-      const { W, H } = flipVideoSize(), sec = n * m.loops / m.fps;
+      const { W, H } = flipVideoSize(), sec = n * m.loops / fps;
       go.textContent = 'Video erstellen';
       f.innerHTML = `<b>${nf(n)} Bilder</b> · ${nf(sec, sec < 10 ? 1 : 0)} s · ${W} × ${H}`;
       note.textContent = F.videoMime() ? 'Das Video wird in Echtzeit aufgenommen. Bitte die App so lange geöffnet lassen. Danach im Teilen-Menü „Video sichern“ wählen.'
@@ -564,7 +566,8 @@ function updateOut() {
       const pages = Math.ceil(n / F.PER_PAGE);
       go.textContent = 'PDF erstellen';
       f.innerHTML = `<b>${nf(pages)} Seite${pages === 1 ? '' : 'n'} A4</b> · ${nf(n)} Karten`;
-      note.textContent = 'Je Seite 12 nummerierte Karten (10 × 4,6 cm) mit Bindestreifen. In Originalgröße drucken, ausschneiden, nach Nummern stapeln und links klammern. Für ein flüssiges Daumenkino sind 40 oder mehr Bilder ideal.';
+      note.textContent = 'Je Seite 12 nummerierte Karten (10 × 4,6 cm) mit Bindestreifen. In Originalgröße drucken, ausschneiden, nach Nummern stapeln und links klammern. Für ein flüssiges Daumenkino sind 40 oder mehr Bilder ideal.'
+        + (m.src === 'morph' && n > 120 ? ' Tipp: Für Papier den Übergang kürzer wählen, sonst werden es sehr viele Seiten.' : '');
     }
     return;
   }
@@ -638,10 +641,45 @@ function buildModeUI() {
   const sorts = [['zufall', 'Zufall'], ['farbe', 'Farbverlauf'], ['hell', 'Hell → Dunkel']];
 
   if (S.mode === 'flip') {
+    g.append(segment('Quelle', [['fotos', 'Fotos'], ['video', 'Live Photo'], ['morph', 'Gesichter']], () => m.src, (v) => { m.src = v; buildModeUI(); buildOutUI(); }));
+    if (m.src === 'video') {
+      g.append(link(VD.frames.length ? `${VD.name}` : 'Live Photo oder Video wählen …', () => $('#inVideo').click(),
+        h('span', { class: 'rv' }, VD.frames.length ? `${VD.frames.length} Bilder · ${nf(VD.dur, 1)} s ›` : '›')));
+      g.append(segment('Bilder aus dem Video', [[6, '6 pro s'], [12, '12 pro s'], [24, '24 pro s']], () => m.vper, (v) => { m.vper = +v; if (VD.file) loadVideo(VD.file); }));
+      g.append(slider('Tempo', { min: 1, max: 30, get: () => m.fps, set: (v) => m.fps = v, fmt: (v) => `${v} Bilder/s` + (v === m.vper ? ' (Echtzeit)' : v < m.vper ? ' (Zeitlupe)' : ' (Zeitraffer)') }));
+      g.append(segment('Bildausschnitt', [['fill', 'Füllen'], ['ganz', 'Ganzes Bild']], () => m.fit, (v) => m.fit = v));
+      g.append(toggle('Echtes Daumenkino', () => m.paper, (v) => { m.paper = v; if (v && m.sound) ensureAudio(); buildModeUI(); }, 'Papierblätter klappen weg und rasten mit Klacken ein, das Tempo ist leicht unregelmäßig'));
+      if (m.paper) {
+        g.append(toggle('Blättergeräusch', () => m.sound, (v) => { m.sound = v; if (v) ensureAudio(); }, 'In der Vorschau und im Video'));
+        g.append(slider('Lebendigkeit', { min: 0.2, max: 1, step: 0.05, get: () => m.life, set: (v) => m.life = v, fmt: pct, sub: 'Wie stark Blätter kippen, hängen bleiben und durchscheinen' }));
+      } else g.append(toggle('Überblenden', () => m.fade, (v) => m.fade = v, 'Weicher Übergang statt hartem Schnitt'));
+      note.append(h('p', { class: 'note' }, 'Live Photo: In der Fotos-App das Live Photo öffnen, auf Teilen tippen und „Als Video sichern“ wählen. Danach hier das neue Video auswählen. Aus 3 Sekunden Live Photo werden bei 12 pro s 36 Bilder, also 3 Seiten zum Ausdrucken.'));
+      return;
+    }
+    if (m.src === 'morph') {
+      g.append(link(MO.faces.length ? 'Weitere Gesichter hinzufügen …' : 'Fotos mit Gesichtern wählen …', () => $('#inFaces').click(), h('span', { class: 'chev' }, '＋')));
+      if (MO.faces.length) {
+        const strip = h('div', { class: 'faces' });
+        morphOrdered().forEach((f) => strip.append(h('div', null, h('img', { src: f.url, alt: '' }),
+          h('button', { 'aria-label': 'Entfernen', onclick: () => { removeFace(f); } }, '✕'))));
+        g.append(h('div', { class: 'row col' }, h('div', { class: 'top' }, h('span', { class: 'rl' }, `${MO.faces.length} Gesicht${MO.faces.length > 1 ? 'er' : ''}`), h('span', { class: 'rv' }, 'automatisch ausgerichtet')), strip));
+        g.append(segment('Reihenfolge', [['auswahl', 'Auswahl'], ['datum', 'Aufnahmedatum']], () => m.morder, (v) => { m.morder = v; MO.ver++; buildModeUI(); }));
+      }
+      g.append(slider('Übergang', { min: 0.4, max: 3, step: 0.1, get: () => m.mdur, set: (v) => m.mdur = v, fmt: (v) => nf(v, 1) + ' s' }));
+      g.append(slider('Standbild', { min: 0, max: 2, step: 0.1, get: () => m.mhold, set: (v) => m.mhold = v, fmt: (v) => v ? nf(v, 1) + ' s' : 'keins', sub: 'Wie lange jedes Gesicht zwischen den Übergängen stehen bleibt' }));
+      g.append(toggle('Zurück zum ersten Gesicht', () => m.mloop, (v) => m.mloop = v, 'Endlos-Schleife ohne Sprung'));
+      note.append(h('p', { class: 'note' }, 'Die Gesichtserkennung läuft komplett auf dem iPhone. Am besten wirken Fotos von vorne mit gut sichtbaren Augen, z. B. ein Kind über die Jahre oder die ganze Familie nacheinander.'));
+      if (MO.fails) note.append(h('p', { class: 'note warn' }, `Bei ${MO.fails} Foto${MO.fails > 1 ? 's' : ''} wurde kein Gesicht gefunden. Sie wurden übersprungen.`));
+      return;
+    }
     g.append(segment('Reihenfolge', [['datum', 'Datum'], ['auswahl', 'Auswahl'], ['farbe', 'Farbe'], ['zufall', 'Zufall']], () => m.order, (v) => m.order = v));
     g.append(slider('Tempo', { min: 1, max: 24, get: () => m.fps, set: (v) => m.fps = v, fmt: (v) => `${v} Bild${v > 1 ? 'er' : ''}/s`, sub: 'Für ein echtes Daumenkino-Gefühl 8–12 Bilder pro Sekunde' }));
     g.append(segment('Bildausschnitt', [['fill', 'Füllen'], ['ganz', 'Ganzes Foto']], () => m.fit, (v) => m.fit = v));
-    g.append(toggle('Überblenden', () => m.fade, (v) => m.fade = v, 'Weicher Übergang statt hartem Schnitt'));
+    g.append(toggle('Echtes Daumenkino', () => m.paper, (v) => { m.paper = v; if (v && m.sound) ensureAudio(); buildModeUI(); }, 'Papierblätter klappen weg und rasten mit Klacken ein, das Tempo ist leicht unregelmäßig'));
+  if (m.paper) {
+    g.append(toggle('Blättergeräusch', () => m.sound, (v) => { m.sound = v; if (v) ensureAudio(); }, 'In der Vorschau und im Video'));
+    g.append(slider('Lebendigkeit', { min: 0.2, max: 1, step: 0.05, get: () => m.life, set: (v) => m.life = v, fmt: pct, sub: 'Wie stark Blätter kippen, hängen bleiben und durchscheinen' }));
+  } else g.append(toggle('Überblenden', () => m.fade, (v) => m.fade = v, 'Weicher Übergang statt hartem Schnitt'));
     g.append(toggle('Datum einblenden', () => m.date, (v) => m.date = v, 'Aufnahmedatum unten rechts'));
     if (m.order === 'zufall') g.append(link('Neu mischen', reshuffle, h('span', { class: 'chev' }, '⟳')));
     if (act.some((t) => !t.file && !t.demo)) note.append(h('p', { class: 'note' }, 'Einige Fotos stammen aus einer früheren Sitzung und liegen nur als kleine, quadratische Vorschau vor. Für volle Qualität diese Fotos neu hinzufügen.'));
@@ -983,121 +1021,277 @@ function showResult(blob, geo, mode) {
 }
 
 /* ── Daumenkino ────────────────────────────────────── */
-const FL = { frames: [], playing: true, k: -1, t0: 0, raf: 0, cache: new Map(), loading: new Set(), W: 0, H: 0, style: '' };
+// Bildquellen: Fotos, Einzelbilder aus Video/Live Photo oder Gesichter-Morph.
+// Jedes Bild ist ein Eintrag {id, date, thumb?, load(maxSide) → {img,w,h,own}, draw?(ctx,W,H)}
+const FL = { items: [], playing: true, k: -1, t0: 0, raf: 0, cache: new Map(), loading: new Set(), W: 0, H: 0, style: '' };
+const VD = { frames: [], file: null, name: '', dur: 0, ver: 0 };
+const MO = { faces: [], ver: 0, fails: 0, morph: null, key: '', sq: null };
+
 function flipFrames() { return F.orderFrames(act, S.flip.order, E.rng(S.seed * 31 + 7)); }
+function flipFps() { return S.flip.src === 'morph' ? 30 : S.flip.fps; }
 function flipVideoSize() {
   const A = aspectOf(S.flip.format), s = S.flip.vres, ev = (v) => Math.round(v / 2) * 2;
   return A >= 1 ? { W: ev(s * A), H: s } : { W: s, H: ev(s / A) };
 }
 // Foto für das Daumenkino laden: aus dem Original (diese Sitzung) mit Seitenverhältnis, sonst die Vorschau
 async function loadSource(t, maxSide) {
-  if (t.file) {
-    try {
-      const d = await decode(t.file);
-      try {
-        const k = Math.min(1, maxSide / Math.max(d.w, d.h)), w = Math.max(1, Math.round(d.w * k)), hh = Math.max(1, Math.round(d.h * k));
-        return { img: E.resample(d.img, 0, 0, d.w, d.h, w, hh), w, h: hh, own: true };
-      } finally { d.done(); }
-    } catch (e) {}
-  }
+  if (t.file) { try { return await blobSource(t.file, maxSide); } catch (e) {} }
   return { img: t.bmp, w: t.size, h: t.size };
 }
-function flipOpts() { const m = S.flip; return { fit: m.fit, date: m.date, bg: m.bg }; }
+async function blobSource(blob, maxSide) {
+  const d = await decode(blob);
+  try {
+    const k = Math.min(1, maxSide / Math.max(d.w, d.h)), w = Math.max(1, Math.round(d.w * k)), hh = Math.max(1, Math.round(d.h * k));
+    return { img: E.resample(d.img, 0, 0, d.w, d.h, w, hh), w, h: hh, own: true };
+  } finally { d.done(); }
+}
+function morphOrdered() {
+  const f = MO.faces.slice();
+  if (S.flip.morder === 'datum') f.sort((a, b) => (a.date || 0) - (b.date || 0));
+  return f;
+}
+function getMorph() {
+  const m = S.flip, key = [MO.ver, m.mdur, m.mhold, m.mloop, m.morder].join();
+  if (MO.key !== key) {
+    if (MO.morph) MO.morph.dispose();
+    MO.morph = new MOR.Morph(morphOrdered().map((f) => ({ canvas: f.bmp, pts: f.pts })), { dur: m.mdur, hold: m.mhold, loop: m.mloop });
+    MO.key = key;
+  }
+  return MO.morph;
+}
+function morphSquare(R) {
+  if (!MO.sq || MO.sq.width !== R) { if (MO.sq) E.free(MO.sq); MO.sq = E.canvas(R, R); }
+  return MO.sq;
+}
+function flipItems() {
+  const m = S.flip;
+  if (m.src === 'video') {
+    return VD.frames.map((f) => ({ id: f.id, date: null, load: (ms) => blobSource(f.blob, ms) }));
+  }
+  if (m.src === 'morph') {
+    if (!MO.faces.length) return [];
+    const mo = getMorph(), key = MO.key;
+    return Array.from({ length: mo.count }, (_, i) => ({
+      id: 'm' + key + '_' + i, date: null,
+      load: async (ms) => { const c = E.canvas(ms, ms); mo.draw(E.ctx2d(c), i, ms); return { img: c, w: ms, h: ms, own: true }; },
+      draw: (ctx, W, H) => {
+        const R = Math.max(W, H), sq = morphSquare(R);
+        mo.draw(E.ctx2d(sq), i, R);
+        F.composeFrame(ctx, W, H, { img: sq, w: R, h: R }, { date: null }, { fit: 'fill', date: false, bg: S.flip.bg });
+      },
+    }));
+  }
+  return flipFrames().map((t) => ({ id: t.id, date: t.date, thumb: { img: t.bmp, w: t.size, h: t.size }, load: (ms) => loadSource(t, ms) }));
+}
+function flipCount() {
+  const m = S.flip;
+  if (m.src === 'video') return VD.frames.length;
+  if (m.src === 'morph') return MO.faces.length ? getMorph().count : 0;
+  return act.length;
+}
+function flipPaper() { return S.flip.src !== 'morph' && S.flip.paper; }
+function flipOpts() {
+  const m = S.flip;
+  return { fit: m.src === 'morph' ? 'fill' : m.fit, date: m.src === 'fotos' && m.date, bg: m.bg, fade: m.src !== 'morph' && !m.paper && m.fade };
+}
+// Ton für die Vorschau: iOS erlaubt Audio erst nach einer Berührung
+const PA = { actx: null };
+function ensureAudio() {
+  try {
+    if (!PA.actx) PA.actx = new (window.AudioContext || window.webkitAudioContext)();
+    if (PA.actx.state !== 'running') PA.actx.resume();
+  } catch (e) {}
+}
 function flipStop() { cancelAnimationFrame(FL.raf); FL.raf = 0; $('#flipPlay').hidden = true; }
 function flipClear() { for (const c of FL.cache.values()) E.free(c); FL.cache.clear(); }
 function flipStart() {
   flipStop(); busy(false);
-  const cv = $('#pv'), st = $('#stage'), em = $('#pvEmpty');
+  const cv = $('#pv'), st = $('#stage'), em = $('#pvEmpty'), m = S.flip;
   $('#zoomBtn').hidden = true;
-  if (!act.length) {
+  FL.items = flipItems();
+  if (!FL.items.length) {
     cv.hidden = true; em.hidden = false;
-    em.textContent = 'Mit dem aktuellen Filter ist kein Foto ausgewählt.'; $('#pvInfo').textContent = ''; updateOut(); return;
+    em.textContent = m.src === 'video' ? 'Wähle unten ein Live Photo (als Video gesichert) oder ein Video.'
+      : m.src === 'morph' ? 'Füge unten mindestens zwei Fotos mit Gesichtern hinzu.'
+      : 'Mit dem aktuellen Filter ist kein Foto ausgewählt.';
+    $('#pvInfo').textContent = ''; updateOut(); return;
   }
   cv.hidden = false; em.hidden = true;
-  FL.frames = flipFrames();
-  const A = aspectOf(S.flip.format), sw = st.clientWidth - 28, sh = st.clientHeight - 28;
+  const A = aspectOf(m.format), sw = st.clientWidth - 28, sh = st.clientHeight - 28;
   const cw = Math.min(sw, sh * A), ch = cw / A, dpr = Math.min(2.5, window.devicePixelRatio || 1);
-  const W = Math.min(1100, Math.round(cw * dpr)), H = Math.round(W / A);
-  const style = [W, H, S.flip.fit, S.flip.date, S.flip.bg].join();
+  const W = Math.min(m.src === 'morph' ? 800 : 1100, Math.round(cw * dpr)), H = Math.round(W / A);
+  const o = flipOpts(), style = [W, H, o.fit, o.date, o.bg, m.src, VD.ver].join();
   if (style !== FL.style) { flipClear(); FL.style = style; }
   FL.W = W; FL.H = H; cv.width = W; cv.height = H;
   cv.style.width = cw + 'px'; cv.style.height = ch + 'px';
-  FL.k = -1; FL.t0 = performance.now(); FL.playing = true;
+  const n = FL.items.length, fps = flipFps();
+  FL.durs = flipPaper() ? F.paperDurations(n, fps, m.life, S.seed) : new Float64Array(n).fill(1000 / fps);
+  FL.cum = new Float64Array(n + 1); for (let i = 0; i < n; i++) FL.cum[i + 1] = FL.cum[i] + FL.durs[i];
+  FL.k = -1; FL.el = 0; FL.t0 = performance.now(); FL.playing = true;
   FL.raf = requestAnimationFrame(flipTick);
   updateOut();
 }
 function flipComposed(i) {
-  const t = FL.frames[i]; if (!t) return null;
-  const c = FL.cache.get(t.id); if (c) return c;
-  if (!FL.loading.has(t.id)) {
-    FL.loading.add(t.id);
+  const it = FL.items[i]; if (!it || it.draw) return null;
+  const c = FL.cache.get(it.id); if (c) return c;
+  if (!FL.loading.has(it.id)) {
+    FL.loading.add(it.id);
     const style = FL.style, W = FL.W, H = FL.H;
-    loadSource(t, Math.max(W, H)).then((src) => {
-      FL.loading.delete(t.id);
+    it.load(Math.max(W, H)).then((src) => {
+      FL.loading.delete(it.id);
       if (style !== FL.style) { if (src.own) E.free(src.img); return; }
-      const cc = E.canvas(W, H); F.composeFrame(E.ctx2d(cc), W, H, src, t, flipOpts());
+      const cc = E.canvas(W, H); F.composeFrame(E.ctx2d(cc), W, H, src, it, flipOpts());
       if (src.own) E.free(src.img);
-      FL.cache.set(t.id, cc);
-      if (FL.cache.size > 36) {           // ältestes, weit entferntes Bild freigeben
-        const near = new Set(); for (let j = -2; j < 10; j++) { const f = FL.frames[(FL.k + j + FL.frames.length) % FL.frames.length]; if (f) near.add(f.id); }
+      FL.cache.set(it.id, cc);
+      if (FL.cache.size > 36) {           // weit entfernte Bilder freigeben
+        const n = FL.items.length, near = new Set();
+        for (let j = -2; j < 10; j++) { const f = FL.items[((FL.k + j) % n + n) % n]; if (f) near.add(f.id); }
         for (const [id, v] of FL.cache) { if (!near.has(id)) { E.free(v); FL.cache.delete(id); if (FL.cache.size <= 30) break; } }
       }
-    }, () => FL.loading.delete(t.id));
+    }, () => FL.loading.delete(it.id));
   }
   return null;
 }
 function flipDraw(i, x) {
+  const it = FL.items[i];
+  if (it.draw) { it.draw(x, FL.W, FL.H); return; }
   const c = flipComposed(i);
   if (c) { x.drawImage(c, 0, 0); return; }
-  const t = FL.frames[i]; F.composeFrame(x, FL.W, FL.H, { img: t.bmp, w: t.size, h: t.size }, t, flipOpts());
+  if (it.thumb) F.composeFrame(x, FL.W, FL.H, it.thumb, it, flipOpts());
+  else { x.fillStyle = S.flip.bg; x.fillRect(0, 0, FL.W, FL.H); }
+}
+// Bild i als Zeichenfläche (fertig geladen oder vorläufig aus der kleinen Vorschau)
+function flipImg(i) {
+  const n = FL.items.length; i = ((i % n) + n) % n;
+  const c = flipComposed(i); if (c) return c;
+  const it = FL.items[i]; if (!it || !it.thumb) return null;
+  FL.fb = FL.fb || new Map();
+  let f = FL.fb.get(it.id);
+  if (!f) {
+    f = E.canvas(Math.round(FL.W / 2), Math.round(FL.H / 2));
+    F.composeFrame(E.ctx2d(f), f.width, f.height, it.thumb, it, flipOpts());
+    FL.fb.set(it.id, f);
+    if (FL.fb.size > 40) { const [k0, v0] = FL.fb.entries().next().value; E.free(v0); FL.fb.delete(k0); }
+  }
+  return f;
 }
 function flipTick(now) {
-  const n = FL.frames.length, m = S.flip, dur = 1000 / m.fps;
+  const n = FL.items.length, fps = flipFps(), o = flipOpts(), m = S.flip, paper = flipPaper();
   if (!n) return;
-  const cv = $('#pv'), x = cv.getContext('2d');
+  const cv = $('#pv'), x = cv.getContext('2d'), T = FL.cum[n];
   // rAF-Zeitstempel kann knapp vor t0 liegen → nie negativ werden lassen
-  const el = Math.max(0, now - FL.t0), k = FL.playing ? Math.floor(el / dur) % n : Math.min(n - 1, Math.max(0, FL.k));
+  if (FL.playing) FL.el = Math.max(0, now - FL.t0) % T;
+  const el = FL.el;
+  let lo = 0, hi = n - 1;
+  while (lo < hi) { const mid = (lo + hi + 1) >> 1; if (FL.cum[mid] <= el) lo = mid; else hi = mid - 1; }
+  const k = lo, u = el - FL.cum[k], d = FL.durs[k];
   for (let j = 1; j <= 6; j++) flipComposed((k + j) % n);
-  const fadeMs = m.fade ? Math.min(dur * 0.6, 450) : 0, into = el % dur;
-  if (k !== FL.k || (FL.playing && fadeMs && into < fadeMs + 20)) {
-    flipDraw(k, x);
-    if (FL.playing && fadeMs && into < fadeMs && n > 1) {
-      x.globalAlpha = 1 - into / fadeMs;
-      const prev = flipComposed((k - 1 + n) % n); if (prev) x.drawImage(prev, 0, 0);
-      x.globalAlpha = 1;
+  if (paper) {
+    F.drawPaper(x, FL.W, FL.H, { cur: flipImg(k), prev: n > 1 ? flipImg(k - 1) : null, next: n > 1 ? flipImg(k + 1) : null, u, d, k, total: n, life: m.life, bg: m.bg });
+    if (k !== FL.k && FL.playing && m.sound && PA.actx && PA.actx.state === 'running')
+      F.paperClick(PA.actx, PA.actx.destination, PA.actx.currentTime + Math.max(0, F.flipMs(d) - u) / 1000, k);
+  } else {
+    const fadeMs = o.fade ? Math.min(d * 0.6, 450) : 0;
+    if (k !== FL.k || (FL.playing && fadeMs && u < fadeMs + 20)) {
+      flipDraw(k, x);
+      if (FL.playing && fadeMs && u < fadeMs && n > 1) {
+        x.globalAlpha = 1 - u / fadeMs;
+        const prev = flipComposed((k - 1 + n) % n); if (prev) x.drawImage(prev, 0, 0);
+        x.globalAlpha = 1;
+      }
     }
-    if (k !== FL.k) {
-      FL.k = k;
-      const t = FL.frames[k];
-      $('#pvInfo').textContent = `Bild ${k + 1} von ${n} · ${m.fps} Bilder/s · ${nf(n / m.fps, n / m.fps < 10 ? 1 : 0)} s` + (t.date ? ' · ' + new Date(t.date).toLocaleDateString('de-DE') : '');
-    }
+  }
+  if (k !== FL.k) {
+    FL.k = k;
+    const it = FL.items[k], sec = T / 1000;
+    $('#pvInfo').textContent = `Bild ${k + 1} von ${n} · ${fps} Bilder/s · ${nf(sec, sec < 10 ? 1 : 0)} s` + (it.date && S.flip.src === 'fotos' ? ' · ' + new Date(it.date).toLocaleDateString('de-DE') : '');
   }
   FL.raf = requestAnimationFrame(flipTick);
 }
 function flipToggle() {
-  const n = FL.frames.length; if (!n) return;
+  if (!FL.items.length) return;
+  if (flipPaper() && S.flip.sound) ensureAudio();
   FL.playing = !FL.playing;
-  if (FL.playing) FL.t0 = performance.now() - FL.k * (1000 / S.flip.fps);
+  if (FL.playing) FL.t0 = performance.now() - FL.el;
   $('#flipPlay').hidden = FL.playing;
 }
 
+/* Video / Live Photo laden */
+async function loadVideo(file) {
+  flipStop();
+  const P = progressModal('Video wird zerlegt', 'Die Einzelbilder werden aus dem Video gelesen. Alles bleibt auf dem Gerät.');
+  try {
+    const r = await F.extractVideoFrames(file, { perSec: S.flip.vper, maxFrames: 240, maxSide: 1440,
+      onProgress: (p) => P.set(p, `${Math.round(p * 100)} %`), isCancelled: () => P.cancelled });
+    VD.ver++;
+    VD.frames = r.frames.map((f, i) => ({ ...f, id: 'v' + VD.ver + '_' + i }));
+    VD.file = file; VD.name = file.name || 'Video'; VD.dur = r.duration;
+    P.close();
+    if (r.frames.length >= 240) toast('Langes Video: Es wurden die ersten 240 Bilder gleichmäßig verteilt übernommen.', 4000);
+  } catch (e) {
+    P.close();
+    if (e.message !== 'abort') alert('Das Video konnte nicht gelesen werden: ' + e.message);
+  }
+  buildModeUI(); schedule(0);
+}
+
+/* Gesichter hinzufügen: erkennen und ausrichten, alles lokal */
+async function addFaces(fileList) {
+  const files = [...fileList]; if (!files.length) return;
+  flipStop();
+  const P = progressModal('Gesichter werden erkannt', 'Beim ersten Mal wird die Gesichtserkennung geladen (ca. 2 MB, danach offline). Die Fotos bleiben auf dem Gerät.');
+  P.set(0, 'Gesichtserkennung wird geladen …');
+  let fails = 0, added = 0;
+  try {
+    await MOR.loadModel();
+    for (let i = 0; i < files.length && !P.cancelled; i++) {
+      P.set(i / files.length, `Foto ${i + 1} von ${files.length}`);
+      try {
+        const date = await withTimeout(exifDate(files[i]), 8000, 'EXIF').catch(() => null);
+        const src = await blobSource(files[i], 2000);
+        const pts = await MOR.findFace(src.img, src.w, src.h);
+        if (!pts) { fails++; E.free(src.img); continue; }
+        const al = MOR.alignFace(src.img, src.w, src.h, pts);
+        E.free(src.img);
+        const th = E.resample(al.canvas, 0, 0, MOR.SIZE, MOR.SIZE, 160, 160);
+        const url = URL.createObjectURL(await toBlob(th, 'image/jpeg', 0.85)); E.free(th);
+        MO.faces.push({ id: uid(), bmp: await toBitmap(al.canvas), pts: al.pts, url, date: date || files[i].lastModified || null });
+        added++;
+      } catch (e) { fails++; }
+    }
+    MO.fails = fails; MO.ver++;
+    P.close();
+    if (!added && fails) toast('In den gewählten Fotos wurde kein Gesicht gefunden.', 4000);
+  } catch (e) {
+    P.close(); alert('Die Gesichtserkennung konnte nicht gestartet werden: ' + e.message);
+  }
+  buildModeUI(); schedule(0);
+}
+function removeFace(f) {
+  MO.faces = MO.faces.filter((x) => x !== f);
+  URL.revokeObjectURL(f.url); if (f.bmp.close) f.bmp.close();
+  MO.ver++; buildModeUI(); schedule(0);
+}
+
 async function exportFlip() {
-  const m = S.flip, frames = flipFrames(), n = frames.length;
+  const m = S.flip, items = flipItems(), n = items.length, fps = flipFps(), o = flipOpts();
   if (!n) return;
   flipStop();
   let lock = null; try { lock = await navigator.wakeLock.request('screen'); } catch (e) {}
   const P = progressModal(m.out === 'video' ? 'Video wird erstellt' : 'Druckbogen wird erstellt',
     m.out === 'video' ? 'Bitte die App geöffnet lassen und den Bildschirm nicht sperren, bis das Video fertig ist.' : `${nf(n)} Karten auf ${nf(Math.ceil(n / F.PER_PAGE))} Seiten A4.`);
+  const name = { fotos: 'Daumenkino', video: 'Daumenkino-LivePhoto', morph: 'Gesichter-Morph' }[m.src];
   try {
     if (m.out === 'video') {
-      const { W, H } = flipVideoSize(), o = flipOpts(), blobs = new Array(n);
+      const { W, H } = flipVideoSize(), blobs = new Array(n);
       for (let i = 0; i < n; i++) {
         if (P.cancelled) throw new Error('abort');
-        const src = await loadSource(frames[i], Math.max(W, H));
-        const c = E.canvas(W, H); F.composeFrame(E.ctx2d(c), W, H, src, frames[i], o);
+        const src = await items[i].load(Math.max(W, H));
+        const c = E.canvas(W, H); F.composeFrame(E.ctx2d(c), W, H, src, items[i], o);
         if (src.own) E.free(src.img);
         blobs[i] = await toBlob(c, 'image/jpeg', 0.92); E.free(c);
         P.set(0.4 * (i + 1) / n, `Bilder vorbereiten: ${i + 1} von ${n}`);
+        if (i % 4 === 3) await frame();
       }
       const poster = URL.createObjectURL(blobs[0]);
       const getFrame = async (i) => {
@@ -1105,27 +1299,37 @@ async function exportFlip() {
           const d = await decode(blobs[i]); const c = E.canvas(d.w, d.h); E.ctx2d(c).drawImage(d.img, 0, 0); d.done(); return c;
         }
       };
-      const { blob, mime } = await F.recordVideo({ W, H, count: n, fps: m.fps, loops: m.loops, fade: m.fade, getFrame,
+      const N = n * m.loops, paper = flipPaper();
+      const durs = paper ? F.paperDurations(N, fps, m.life, S.seed) : new Float64Array(N).fill(1000 / fps);
+      const paint = paper
+        ? (x, k, u, d, img) => F.drawPaper(x, W, H, { cur: img(0), prev: k > 0 ? img(-1) : null, next: img(1), u, d, k: k % n, total: n, life: m.life, bg: m.bg })
+        : (x, k, u, d, img) => {
+          const cur = img(0), prev = k > 0 ? img(-1) : null, fadeMs = o.fade ? Math.min(d * 0.6, 450) : 0;
+          if (prev && fadeMs && u < fadeMs) { x.globalAlpha = 1; x.drawImage(prev, 0, 0, W, H); x.globalAlpha = u / fadeMs; x.drawImage(cur, 0, 0, W, H); x.globalAlpha = 1; }
+          else x.drawImage(cur, 0, 0, W, H);
+        };
+      const { blob, mime } = await F.recordVideo({ W, H, N, count: n, durs, getFrame, paint,
+        sound: paper && m.sound ? F.paperClick : null, soundAt: F.flipMs,
         onProgress: (p) => P.set(0.4 + 0.6 * p, `Aufnahme (Echtzeit): ${Math.round(p * 100)} %`), isCancelled: () => P.cancelled });
       P.close();
       const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-      showFileResult(blob, `Daumenkino-${W}x${H}.${ext}`, { video: true, poster,
-        facts: `<b>${W} × ${H}</b> · ${nf(n * m.loops / m.fps, 1)} s · ${nf(blob.size / 1048576, 1)} MB`,
-        hint: ext === 'mp4' ? 'Im Teilen-Menü auf „Video sichern“ tippen, dann liegt das Daumenkino in deiner Fotos-App.' : 'Dieser Browser erzeugt WebM-Videos. Die Fotos-App auf dem iPhone kann sie nicht sichern, „Datei laden“ funktioniert.' });
+      showFileResult(blob, `${name}-${W}x${H}.${ext}`, { video: true, poster,
+        facts: `<b>${W} × ${H}</b> · ${nf(durs.reduce((a, b) => a + b, 0) / 1000, 1)} s · ${nf(blob.size / 1048576, 1)} MB` + (paper && m.sound && /mp4a|opus/.test(mime) ? ' · mit Ton' : ''),
+        hint: ext === 'mp4' ? 'Im Teilen-Menü auf „Video sichern“ tippen, dann liegt das Video in deiner Fotos-App.' : 'Dieser Browser erzeugt WebM-Videos. Die Fotos-App auf dem iPhone kann sie nicht sichern, „Datei laden“ funktioniert.' });
     } else {
-      const dpi = 200, pages = Math.ceil(n / F.PER_PAGE), out = [], o = flipOpts();
+      const dpi = 200, pages = Math.ceil(n / F.PER_PAGE), out = [];
       let poster = null;
       for (let p = 0; p < pages; p++) {
-        const items = [];
+        const cards = [];
         for (let j = 0; j < F.PER_PAGE && p * F.PER_PAGE + j < n; j++) {
           if (P.cancelled) throw new Error('abort');
-          const i = p * F.PER_PAGE + j, t = frames[i];
-          items.push({ no: i + 1, t, src: await loadSource(t, 800) });
+          const i = p * F.PER_PAGE + j;
+          cards.push({ no: i + 1, t: items[i], src: await items[i].load(800) });
           P.set((i + 1) / n * 0.95, `Karte ${i + 1} von ${n}`);
         }
         const mm = dpi / 25.4, c = E.canvas(Math.round(210 * mm), Math.round(297 * mm));
-        F.drawPrintPage(E.ctx2d(c), dpi, items, p + 1, pages, o);
-        items.forEach((it) => { if (it.src.own) E.free(it.src.img); });
+        F.drawPrintPage(E.ctx2d(c), dpi, cards, p + 1, pages, o);
+        cards.forEach((it) => { if (it.src.own) E.free(it.src.img); });
         const b = await toBlob(c, 'image/jpeg', 0.9);
         if (!poster) poster = URL.createObjectURL(b);
         out.push({ bytes: new Uint8Array(await b.arrayBuffer()), w: c.width, h: c.height });
@@ -1133,7 +1337,7 @@ async function exportFlip() {
       }
       const pdf = F.makePdf(out);
       P.close();
-      showFileResult(pdf, `Daumenkino-${n}-Karten.pdf`, { image: poster,
+      showFileResult(pdf, `${name}-${n}-Karten.pdf`, { image: poster,
         facts: `<b>${pages} Seite${pages === 1 ? '' : 'n'} A4</b> · ${n} Karten · ${nf(pdf.size / 1048576, 1)} MB`,
         hint: 'Zum Drucken im Teilen-Menü „Drucken“ wählen und die Größe auf 100 % lassen. Oder „In Dateien sichern“.' });
     }
@@ -1306,6 +1510,8 @@ function hideWait() { clearTimeout(waitT); if (waitBox) { waitBox.close(); waitB
 function wire() {
   $('#inPhotos').addEventListener('change', (e) => { hideWait(); const f = e.target.files; if (f && f.length) addFiles(f); e.target.value = ''; });
   $('#inPhotos').addEventListener('cancel', hideWait);
+  $('#inVideo').addEventListener('change', (e) => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (f) loadVideo(f); });
+  $('#inFaces').addEventListener('change', (e) => { const f = e.target.files; if (f && f.length) addFaces(f); e.target.value = ''; });
   $('#inTarget').addEventListener('change', async (e) => {
     const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
     try { await setTarget(f, false); buildModeUI(); schedule(0); } catch (err) { toast('Das Bild konnte nicht gelesen werden.'); }
